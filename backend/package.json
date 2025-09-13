@@ -1,0 +1,33 @@
+{
+  "name": "bob-backend",
+  "version": "1.0.0",
+  "description": "Bob Backend - API for Claude Code instance management",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "migrate": "tsx src/cli/migrate.ts",
+    "migrate:status": "tsx src/cli/migrate.ts status",
+    "migrate:up": "tsx src/cli/migrate.ts up",
+    "migrate:down": "tsx src/cli/migrate.ts down",
+    "migrate:reset": "tsx src/cli/migrate.ts reset",
+    "migrate:create": "tsx src/cli/migrate.ts create"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "ws": "^8.16.0",
+    "cors": "^2.8.5",
+    "node-pty": "^1.0.0",
+    "sqlite3": "^5.1.6"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/ws": "^8.5.10",
+    "@types/cors": "^2.8.17",
+    "@types/node": "^20.11.16",
+    "@types/sqlite3": "^3.1.11",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  }
+}
