@@ -127,10 +127,37 @@ export class GitService {
     }
   }
 
-  async createWorktree(repositoryId: string, branchName: string, baseBranch = 'main'): Promise<Worktree> {
+  async createWorktree(repositoryId: string, branchName: string, baseBranch?: string): Promise<Worktree> {
     const repository = this.repositories.get(repositoryId);
     if (!repository) {
       throw new Error(`Repository ${repositoryId} not found`);
+    }
+
+    // Auto-detect default branch if not provided
+    if (!baseBranch) {
+      try {
+        const { stdout: defaultBranch } = await execAsync('git rev-parse --abbrev-ref HEAD', {
+          cwd: repository.path
+        });
+        baseBranch = defaultBranch.trim();
+      } catch (error) {
+        // Fallback: try main, then master
+        try {
+          await execAsync('git show-ref --verify --quiet refs/heads/main', {
+            cwd: repository.path
+          });
+          baseBranch = 'main';
+        } catch {
+          try {
+            await execAsync('git show-ref --verify --quiet refs/heads/master', {
+              cwd: repository.path
+            });
+            baseBranch = 'master';
+          } catch {
+            throw new Error('Could not determine default branch (tried HEAD, main, master)');
+          }
+        }
+      }
     }
 
     // Create worktrees in ~/.bob directory
@@ -142,8 +169,8 @@ export class GitService {
     const worktreePath = join(bobDir, `${repository.name}-${branchName}`);
 
     try {
-      await execAsync(`git worktree add "${worktreePath}" -b "${branchName}" "${baseBranch}"`, { 
-        cwd: repository.path 
+      await execAsync(`git worktree add "${worktreePath}" -b "${branchName}" "${baseBranch}"`, {
+        cwd: repository.path
       });
 
       const worktreeId = Buffer.from(worktreePath).toString('base64');

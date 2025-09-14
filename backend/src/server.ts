@@ -9,6 +9,7 @@ import { DatabaseService } from './database/database.js';
 import { createRepositoryRoutes } from './routes/repositories.js';
 import { createInstanceRoutes } from './routes/instances.js';
 import { createFilesystemRoutes } from './routes/filesystem.js';
+import gitRoutes from './routes/git.js';
 
 const app = express();
 const server = createServer(app);
@@ -34,8 +35,24 @@ app.use('/api/repositories', createRepositoryRoutes(gitService, claudeService));
 app.use('/api/instances', createInstanceRoutes(claudeService, terminalService, gitService));
 app.use('/api/filesystem', createFilesystemRoutes());
 
+// Make services available to git routes
+app.locals.gitService = gitService;
+app.locals.claudeService = claudeService;
+app.use('/api/git', gitRoutes);
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+app.get('/api/token-usage', (req, res) => {
+  try {
+    // Get token usage stats from Claude service
+    const tokenStats = claudeService.getTokenUsageStats();
+    res.json(tokenStats);
+  } catch (error) {
+    console.error('Error getting token usage stats:', error);
+    res.status(500).json({ error: 'Failed to get token usage statistics' });
+  }
 });
 
 wss.on('connection', (ws, req) => {

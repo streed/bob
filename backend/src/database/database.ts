@@ -236,6 +236,207 @@ export class DatabaseService {
     );
   }
 
+  // Token Usage Statistics methods
+  async saveTokenUsageSession(sessionData: {
+    id: string;
+    instanceId: string;
+    worktreeId: string;
+    repositoryId: string;
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadTokens?: number;
+    cacheCreationTokens?: number;
+    totalCostUsd?: number;
+    sessionStart: Date;
+    sessionEnd?: Date;
+  }): Promise<void> {
+    await this.run(
+      `INSERT OR REPLACE INTO token_usage_sessions
+       (id, instance_id, worktree_id, repository_id, input_tokens, output_tokens,
+        cache_read_tokens, cache_creation_tokens, total_cost_usd, session_start, session_end)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        sessionData.id,
+        sessionData.instanceId,
+        sessionData.worktreeId,
+        sessionData.repositoryId,
+        sessionData.inputTokens,
+        sessionData.outputTokens,
+        sessionData.cacheReadTokens || 0,
+        sessionData.cacheCreationTokens || 0,
+        sessionData.totalCostUsd || 0,
+        sessionData.sessionStart.toISOString(),
+        sessionData.sessionEnd ? sessionData.sessionEnd.toISOString() : null
+      ]
+    );
+  }
+
+  async updateInstanceUsageSummary(instanceId: string, usage: {
+    worktreeId: string;
+    repositoryId: string;
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadTokens?: number;
+    cacheCreationTokens?: number;
+    totalCostUsd?: number;
+  }): Promise<void> {
+    // Get current summary or create new one
+    const current = await this.get(
+      'SELECT * FROM instance_usage_summary WHERE instance_id = ?',
+      [instanceId]
+    );
+
+    if (current) {
+      // Update existing summary
+      await this.run(
+        `UPDATE instance_usage_summary
+         SET total_input_tokens = total_input_tokens + ?,
+             total_output_tokens = total_output_tokens + ?,
+             total_cache_read_tokens = total_cache_read_tokens + ?,
+             total_cache_creation_tokens = total_cache_creation_tokens + ?,
+             total_cost_usd = total_cost_usd + ?,
+             session_count = session_count + 1,
+             last_usage = CURRENT_TIMESTAMP
+         WHERE instance_id = ?`,
+        [
+          usage.inputTokens,
+          usage.outputTokens,
+          usage.cacheReadTokens || 0,
+          usage.cacheCreationTokens || 0,
+          usage.totalCostUsd || 0,
+          instanceId
+        ]
+      );
+    } else {
+      // Create new summary
+      await this.run(
+        `INSERT INTO instance_usage_summary
+         (instance_id, worktree_id, repository_id, total_input_tokens, total_output_tokens,
+          total_cache_read_tokens, total_cache_creation_tokens, total_cost_usd,
+          session_count, first_usage, last_usage)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+        [
+          instanceId,
+          usage.worktreeId,
+          usage.repositoryId,
+          usage.inputTokens,
+          usage.outputTokens,
+          usage.cacheReadTokens || 0,
+          usage.cacheCreationTokens || 0,
+          usage.totalCostUsd || 0
+        ]
+      );
+    }
+  }
+
+  async updateDailyUsageStats(date: string, usage: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadTokens?: number;
+    cacheCreationTokens?: number;
+    totalCostUsd?: number;
+  }): Promise<void> {
+    const existing = await this.get(
+      'SELECT * FROM daily_usage_stats WHERE date = ?',
+      [date]
+    );
+
+    if (existing) {
+      // Update existing daily stats
+      await this.run(
+        `UPDATE daily_usage_stats
+         SET total_input_tokens = total_input_tokens + ?,
+             total_output_tokens = total_output_tokens + ?,
+             total_cache_read_tokens = total_cache_read_tokens + ?,
+             total_cache_creation_tokens = total_cache_creation_tokens + ?,
+             total_cost_usd = total_cost_usd + ?
+         WHERE date = ?`,
+        [
+          usage.inputTokens,
+          usage.outputTokens,
+          usage.cacheReadTokens || 0,
+          usage.cacheCreationTokens || 0,
+          usage.totalCostUsd || 0,
+          date
+        ]
+      );
+    } else {
+      // Create new daily stats
+      await this.run(
+        `INSERT INTO daily_usage_stats
+         (date, total_input_tokens, total_output_tokens, total_cache_read_tokens,
+          total_cache_creation_tokens, total_cost_usd, session_count, active_instances)
+         VALUES (?, ?, ?, ?, ?, ?, 1, 1)`,
+        [
+          date,
+          usage.inputTokens,
+          usage.outputTokens,
+          usage.cacheReadTokens || 0,
+          usage.cacheCreationTokens || 0,
+          usage.totalCostUsd || 0
+        ]
+      );
+    }
+  }
+
+  async getDailyUsageStats(days: number = 7): Promise<any[]> {
+    return await this.all(
+      `SELECT * FROM daily_usage_stats
+       WHERE date >= date('now', '-' || ? || ' days')
+       ORDER BY date ASC`,
+      [days]
+    );
+  }
+
+  async getInstanceUsageSummary(instanceId?: string): Promise<any[]> {
+    if (instanceId) {
+      const result = await this.get(
+        'SELECT * FROM instance_usage_summary WHERE instance_id = ?',
+        [instanceId]
+      );
+      return result ? [result] : [];
+    }
+
+    return await this.all(
+      `SELECT ius.*, ci.status, ci.last_activity
+       FROM instance_usage_summary ius
+       LEFT JOIN claude_instances ci ON ius.instance_id = ci.id
+       ORDER BY ius.last_usage DESC`
+    );
+  }
+
+  async getTotalUsageStats(): Promise<{
+    totalInputTokens: number;
+    totalOutputTokens: number;
+    totalSessions: number;
+    totalCost: number;
+  }> {
+    const result = await this.get(
+      `SELECT
+         COALESCE(SUM(total_input_tokens + total_cache_read_tokens + total_cache_creation_tokens), 0) as totalInputTokens,
+         COALESCE(SUM(total_output_tokens), 0) as totalOutputTokens,
+         COALESCE(SUM(session_count), 0) as totalSessions,
+         COALESCE(SUM(total_cost_usd), 0) as totalCost
+       FROM instance_usage_summary`
+    );
+
+    return {
+      totalInputTokens: result?.totalInputTokens || 0,
+      totalOutputTokens: result?.totalOutputTokens || 0,
+      totalSessions: result?.totalSessions || 0,
+      totalCost: result?.totalCost || 0
+    };
+  }
+
+  async cleanupOldTokenUsage(daysToKeep: number = 30): Promise<void> {
+    // Clean up old session data but keep daily aggregates
+    await this.run(
+      `DELETE FROM token_usage_sessions
+       WHERE session_start < date('now', '-' || ? || ' days')`,
+      [daysToKeep]
+    );
+  }
+
   close(): void {
     this.db.close();
   }

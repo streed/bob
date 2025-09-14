@@ -19,13 +19,51 @@ router.get('/:worktreeId/diff', async (req, res) => {
       return res.status(404).json({ error: 'Worktree not found' });
     }
 
-    // Get git diff
-    const { stdout } = await execAsync('git diff HEAD', {
+    // Get comprehensive diff including untracked files
+    const { stdout: diff } = await execAsync('git diff HEAD', {
       cwd: worktree.path
     });
 
+    // Get untracked files
+    const { stdout: status } = await execAsync('git status --porcelain', {
+      cwd: worktree.path
+    });
+
+    let completeDiff = diff;
+
+    // Add untracked files to the diff
+    if (status.trim()) {
+      const untrackedFiles = status
+        .split('\n')
+        .filter(line => line.startsWith('??'))
+        .map(line => line.substring(3).trim());
+
+      for (const file of untrackedFiles) {
+        try {
+          const { stdout: fileContent } = await execAsync(`cat "${file}"`, {
+            cwd: worktree.path
+          });
+
+          completeDiff += `\ndiff --git a/${file} b/${file}\n`;
+          completeDiff += `new file mode 100644\n`;
+          completeDiff += `index 0000000..${Math.random().toString(36).substr(2, 7)}\n`;
+          completeDiff += `--- /dev/null\n`;
+          completeDiff += `+++ b/${file}\n`;
+          completeDiff += `@@ -0,0 +1,${fileContent.split('\n').length} @@\n`;
+
+          fileContent.split('\n').forEach(line => {
+            if (line.trim() || fileContent.indexOf(line) !== fileContent.lastIndexOf('\n')) {
+              completeDiff += `+${line}\n`;
+            }
+          });
+        } catch (fileError) {
+          console.warn(`Failed to read untracked file ${file}:`, fileError);
+        }
+      }
+    }
+
     res.set('Content-Type', 'text/plain');
-    res.send(stdout);
+    res.send(completeDiff);
   } catch (error) {
     console.error('Error getting git diff:', error);
     res.status(500).json({ error: 'Failed to get git diff' });

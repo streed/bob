@@ -206,7 +206,18 @@ function App() {
   return (
     <div className="container">
       <div className="header">
-        <h1>Bob</h1>
+        <h1
+          onClick={() => setSelectedWorktreeId(null)}
+          style={{
+            cursor: 'pointer',
+            transition: 'color 0.2s ease',
+            margin: 0
+          }}
+          onMouseEnter={(e) => e.target.style.color = '#58a6ff'}
+          onMouseLeave={(e) => e.target.style.color = ''}
+        >
+          Bob
+        </h1>
         <p>Manage multiple Claude Code instances across git repositories and worktrees</p>
       </div>
 

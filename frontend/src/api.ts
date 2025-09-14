@@ -105,6 +105,76 @@ class ApiClient {
       method: 'DELETE',
     });
   }
+
+  // Git operations
+  async getGitDiff(worktreeId: string): Promise<string> {
+    const response = await fetch(`${API_BASE}/git/${worktreeId}/diff`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return response.text();
+  }
+
+  async generateCommitMessage(worktreeId: string): Promise<{
+    commitMessage: string;
+    changedFiles: string[];
+    fileCount: number;
+    fallback?: boolean;
+  }> {
+    return this.request(`/git/${worktreeId}/generate-commit-message`, {
+      method: 'POST',
+    });
+  }
+
+  async commitChanges(worktreeId: string, message: string): Promise<{
+    message: string;
+    commitMessage: string;
+  }> {
+    return this.request(`/git/${worktreeId}/commit`, {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    });
+  }
+
+  async revertChanges(worktreeId: string): Promise<{ message: string }> {
+    return this.request(`/git/${worktreeId}/revert`, {
+      method: 'POST',
+    });
+  }
+
+  async createPullRequest(worktreeId: string): Promise<{
+    message: string;
+    branch: string;
+    title: string;
+    pr?: string;
+  }> {
+    return this.request(`/git/${worktreeId}/create-pr`, {
+      method: 'POST',
+    });
+  }
+
+  // Token usage statistics
+  async getTokenUsageStats(): Promise<{
+    totalSessions: number;
+    totalInputTokens: number;
+    totalOutputTokens: number;
+    dailyUsage: Array<{
+      date: string;
+      inputTokens: number;
+      outputTokens: number;
+      sessions: number;
+    }>;
+    instanceUsage: Array<{
+      instanceId: string;
+      worktreeId: string;
+      inputTokens: number;
+      outputTokens: number;
+      lastActivity: string;
+    }>;
+    hasRealData?: boolean;
+  }> {
+    return this.request('/token-usage');
+  }
 }
 
 export const api = new ApiClient();

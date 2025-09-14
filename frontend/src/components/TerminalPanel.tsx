@@ -14,6 +14,534 @@ interface TerminalPanelProps {
   error: string | null;
 }
 
+// Unified diff view component
+const UnifiedDiffView: React.FC<{ gitDiff: string }> = ({ gitDiff }) => {
+  return (
+    <div style={{
+      background: '#0d1117',
+      border: '1px solid #30363d',
+      borderRadius: '6px',
+      overflow: 'hidden',
+      fontSize: '12px',
+      fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace'
+    }}>
+      {gitDiff.split('\n').map((line, index) => {
+        let lineStyle: React.CSSProperties = {
+          padding: '0 8px',
+          margin: 0,
+          minHeight: '20px',
+          lineHeight: '20px',
+          whiteSpace: 'pre'
+        };
+
+        if (line.startsWith('diff --git')) {
+          lineStyle = {
+            ...lineStyle,
+            backgroundColor: '#21262d',
+            color: '#f0f6fc',
+            fontWeight: 'bold',
+            borderBottom: '1px solid #30363d'
+          };
+        } else if (line.startsWith('@@')) {
+          lineStyle = {
+            ...lineStyle,
+            backgroundColor: '#0969da1a',
+            color: '#58a6ff'
+          };
+        } else if (line.startsWith('+') && !line.startsWith('+++')) {
+          lineStyle = {
+            ...lineStyle,
+            backgroundColor: '#0361491a',
+            color: '#3fb950'
+          };
+        } else if (line.startsWith('-') && !line.startsWith('---')) {
+          lineStyle = {
+            ...lineStyle,
+            backgroundColor: '#67060c1a',
+            color: '#f85149'
+          };
+        } else if (line.startsWith('+++') || line.startsWith('---')) {
+          lineStyle = {
+            ...lineStyle,
+            color: '#8b949e',
+            fontWeight: 'bold'
+          };
+        } else if (line.startsWith('new file mode') || line.startsWith('index')) {
+          lineStyle = {
+            ...lineStyle,
+            color: '#8b949e'
+          };
+        } else {
+          lineStyle = {
+            ...lineStyle,
+            color: '#e6edf3'
+          };
+        }
+
+        return (
+          <div key={index} style={lineStyle}>
+            {line || ' '}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// Split diff view component
+const SplitDiffView: React.FC<{ gitDiff: string }> = ({ gitDiff }) => {
+  const parsedDiff = parseDiffForSplitView(gitDiff);
+
+  return (
+    <div style={{
+      background: '#0d1117',
+      border: '1px solid #30363d',
+      borderRadius: '6px',
+      overflow: 'hidden',
+      fontSize: '12px',
+      fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace'
+    }}>
+      {parsedDiff.map((file, fileIndex) => (
+        <div key={fileIndex}>
+          {/* File header */}
+          <div style={{
+            backgroundColor: '#21262d',
+            color: '#f0f6fc',
+            fontWeight: 'bold',
+            padding: '8px',
+            borderBottom: '1px solid #30363d'
+          }}>
+            {file.fileName}
+          </div>
+
+          {/* Split view table */}
+          <div style={{ display: 'flex', width: '100%' }}>
+            {/* Left side (old/removed) */}
+            <div style={{ flex: 1, borderRight: '1px solid #30363d' }}>
+              {file.chunks.map((chunk, chunkIndex) => (
+                <div key={`left-${chunkIndex}`}>
+                  {chunk.oldLines.map((line, lineIndex) => (
+                    <div key={lineIndex} style={{
+                      padding: '0 8px',
+                      minHeight: '20px',
+                      lineHeight: '20px',
+                      backgroundColor: line.type === 'removed' ? '#67060c1a' : 'transparent',
+                      color: line.type === 'removed' ? '#f85149' : '#8b949e'
+                    }}>
+                      {line.content || ' '}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+
+            {/* Right side (new/added) */}
+            <div style={{ flex: 1 }}>
+              {file.chunks.map((chunk, chunkIndex) => (
+                <div key={`right-${chunkIndex}`}>
+                  {chunk.newLines.map((line, lineIndex) => (
+                    <div key={lineIndex} style={{
+                      padding: '0 8px',
+                      minHeight: '20px',
+                      lineHeight: '20px',
+                      backgroundColor: line.type === 'added' ? '#0361491a' : 'transparent',
+                      color: line.type === 'added' ? '#3fb950' : '#8b949e'
+                    }}>
+                      {line.content || ' '}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// Helper function to parse diff for split view
+const parseDiffForSplitView = (gitDiff: string) => {
+  const lines = gitDiff.split('\n');
+  const files: Array<{
+    fileName: string;
+    chunks: Array<{
+      oldLines: Array<{ content: string; type: 'context' | 'removed' | 'empty' }>;
+      newLines: Array<{ content: string; type: 'context' | 'added' | 'empty' }>;
+    }>;
+  }> = [];
+
+  let currentFile: typeof files[0] | null = null;
+  let currentChunk: typeof files[0]['chunks'][0] | null = null;
+
+  for (const line of lines) {
+    if (line.startsWith('diff --git')) {
+      // Start new file
+      const fileName = line.split(' b/')[1] || line.split(' ')[3];
+      currentFile = { fileName, chunks: [] };
+      files.push(currentFile);
+    } else if (line.startsWith('@@') && currentFile) {
+      // Start new chunk
+      currentChunk = { oldLines: [], newLines: [] };
+      currentFile.chunks.push(currentChunk);
+    } else if (currentChunk && currentFile) {
+      if (line.startsWith('+') && !line.startsWith('+++')) {
+        // Added line - only in new/right side
+        currentChunk.oldLines.push({ content: '', type: 'empty' });
+        currentChunk.newLines.push({ content: line.slice(1), type: 'added' });
+      } else if (line.startsWith('-') && !line.startsWith('---')) {
+        // Removed line - only in old/left side
+        currentChunk.oldLines.push({ content: line.slice(1), type: 'removed' });
+        currentChunk.newLines.push({ content: '', type: 'empty' });
+      } else if (!line.startsWith('+++') && !line.startsWith('---') && !line.startsWith('new file') && !line.startsWith('index')) {
+        // Context line - in both sides
+        const content = line.startsWith(' ') ? line.slice(1) : line;
+        if (content.trim()) {
+          currentChunk.oldLines.push({ content, type: 'context' });
+          currentChunk.newLines.push({ content, type: 'context' });
+        }
+      }
+    }
+  }
+
+  return files;
+};
+
+// Token Usage Dashboard Component
+const TokenUsageDashboard: React.FC = () => {
+  const [tokenStats, setTokenStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  useEffect(() => {
+    const loadTokenStats = async () => {
+      try {
+        if (!loading) setIsUpdating(true);
+        const stats = await api.getTokenUsageStats();
+        setTokenStats(stats);
+      } catch (error) {
+        console.error('Failed to load token stats:', error);
+      } finally {
+        setLoading(false);
+        setIsUpdating(false);
+      }
+    };
+
+    loadTokenStats();
+    const interval = setInterval(loadTokenStats, 5000); // Update every 5 seconds for real-time feel
+    return () => clearInterval(interval);
+  }, []);
+
+  if (loading) {
+    return (
+      <div style={{
+        flex: 1,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#888'
+      }}>
+        Loading token usage...
+      </div>
+    );
+  }
+
+  if (!tokenStats) {
+    return (
+      <div style={{
+        flex: 1,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#888'
+      }}>
+        Failed to load token usage stats
+      </div>
+    );
+  }
+
+  const maxDailyTokens = Math.max(...tokenStats.dailyUsage.map((day: any) => day.inputTokens + day.outputTokens));
+
+  return (
+    <div style={{
+      flex: 1,
+      padding: '24px',
+      overflow: 'auto'
+    }}>
+      {/* Header */}
+      <div style={{ marginBottom: '32px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+          <h2 style={{ color: '#fff', margin: 0, fontSize: '24px' }}>Token Usage Dashboard</h2>
+          {isUpdating && (
+            <div style={{
+              width: '8px',
+              height: '8px',
+              backgroundColor: '#3fb950',
+              borderRadius: '50%',
+              animation: 'pulse 1.5s ease-in-out infinite'
+            }} />
+          )}
+        </div>
+        <p style={{ color: '#888', margin: 0, fontSize: '14px' }}>
+          Monitor your Claude Code sessions and token consumption • Updates every 5 seconds
+        </p>
+
+        {/* Data Source Indicator */}
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '6px',
+          marginTop: '8px',
+          padding: '4px 8px',
+          backgroundColor: tokenStats.hasRealData ? '#1a4b2e' : '#4b2a1a',
+          border: `1px solid ${tokenStats.hasRealData ? '#3fb950' : '#f85149'}`,
+          borderRadius: '12px',
+          fontSize: '12px',
+          fontWeight: '500'
+        }}>
+          <div style={{
+            width: '6px',
+            height: '6px',
+            borderRadius: '50%',
+            backgroundColor: tokenStats.hasRealData ? '#3fb950' : '#f85149'
+          }} />
+          {tokenStats.hasRealData ? 'Real-time data' : 'Simulated data'}
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes pulse {
+          0% {
+            transform: scale(0.95);
+            box-shadow: 0 0 0 0 rgba(63, 185, 80, 0.7);
+          }
+          70% {
+            transform: scale(1);
+            box-shadow: 0 0 0 10px rgba(63, 185, 80, 0);
+          }
+          100% {
+            transform: scale(0.95);
+            box-shadow: 0 0 0 0 rgba(63, 185, 80, 0);
+          }
+        }
+      `}</style>
+
+      {/* Summary Cards */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gap: '16px',
+        marginBottom: '32px'
+      }}>
+        <div style={{
+          backgroundColor: '#1a1a1a',
+          border: '1px solid #333',
+          borderRadius: '8px',
+          padding: '20px'
+        }}>
+          <div style={{ color: '#888', fontSize: '12px', marginBottom: '4px' }}>TOTAL INPUT TOKENS</div>
+          <div style={{
+            color: '#58a6ff',
+            fontSize: '28px',
+            fontWeight: 'bold',
+            transition: 'all 0.3s ease-in-out'
+          }}>
+            {tokenStats.totalInputTokens.toLocaleString()}
+          </div>
+        </div>
+
+        <div style={{
+          backgroundColor: '#1a1a1a',
+          border: '1px solid #333',
+          borderRadius: '8px',
+          padding: '20px'
+        }}>
+          <div style={{ color: '#888', fontSize: '12px', marginBottom: '4px' }}>TOTAL OUTPUT TOKENS</div>
+          <div style={{
+            color: '#3fb950',
+            fontSize: '28px',
+            fontWeight: 'bold',
+            transition: 'all 0.3s ease-in-out'
+          }}>
+            {tokenStats.totalOutputTokens.toLocaleString()}
+          </div>
+        </div>
+
+        <div style={{
+          backgroundColor: '#1a1a1a',
+          border: '1px solid #333',
+          borderRadius: '8px',
+          padding: '20px'
+        }}>
+          <div style={{ color: '#888', fontSize: '12px', marginBottom: '4px' }}>TOTAL SESSIONS</div>
+          <div style={{
+            color: '#f0f6fc',
+            fontSize: '28px',
+            fontWeight: 'bold',
+            transition: 'all 0.3s ease-in-out'
+          }}>
+            {tokenStats.totalSessions.toLocaleString()}
+          </div>
+        </div>
+
+        <div style={{
+          backgroundColor: '#1a1a1a',
+          border: '1px solid #333',
+          borderRadius: '8px',
+          padding: '20px'
+        }}>
+          <div style={{ color: '#888', fontSize: '12px', marginBottom: '4px' }}>AVG TOKENS/SESSION</div>
+          <div style={{
+            color: '#d2a8ff',
+            fontSize: '28px',
+            fontWeight: 'bold',
+            transition: 'all 0.3s ease-in-out'
+          }}>
+            {Math.round((tokenStats.totalInputTokens + tokenStats.totalOutputTokens) / tokenStats.totalSessions).toLocaleString()}
+          </div>
+        </div>
+      </div>
+
+      {/* Daily Usage Chart */}
+      <div style={{
+        backgroundColor: '#1a1a1a',
+        border: '1px solid #333',
+        borderRadius: '8px',
+        padding: '24px',
+        marginBottom: '24px'
+      }}>
+        <h3 style={{ color: '#fff', margin: 0, marginBottom: '20px', fontSize: '18px' }}>Daily Token Usage (7 Days)</h3>
+        <div style={{
+          display: 'flex',
+          alignItems: 'end',
+          gap: '8px',
+          height: '200px'
+        }}>
+          {tokenStats.dailyUsage.map((day: any, index: number) => {
+            const totalTokens = day.inputTokens + day.outputTokens;
+            const heightPercent = (totalTokens / maxDailyTokens) * 100;
+            const inputPercent = (day.inputTokens / totalTokens) * 100;
+
+            return (
+              <div key={day.date} style={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                height: '100%'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  height: `${Math.max(5, heightPercent)}%`,
+                  width: '100%',
+                  justifyContent: 'end'
+                }}>
+                  <div style={{
+                    backgroundColor: '#3fb950',
+                    width: '80%',
+                    height: `${100 - inputPercent}%`,
+                    minHeight: '2px',
+                    borderRadius: '2px 2px 0 0',
+                    transition: 'height 0.5s ease-in-out'
+                  }} />
+                  <div style={{
+                    backgroundColor: '#58a6ff',
+                    width: '80%',
+                    height: `${inputPercent}%`,
+                    minHeight: '2px',
+                    borderRadius: '0 0 2px 2px',
+                    transition: 'height 0.5s ease-in-out'
+                  }} />
+                </div>
+                <div style={{
+                  color: '#888',
+                  fontSize: '10px',
+                  marginTop: '8px',
+                  textAlign: 'center'
+                }}>
+                  {new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </div>
+                <div style={{
+                  color: '#666',
+                  fontSize: '9px',
+                  textAlign: 'center'
+                }}>
+                  {totalTokens.toLocaleString()}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{
+          display: 'flex',
+          gap: '20px',
+          marginTop: '16px',
+          fontSize: '12px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ width: '12px', height: '12px', backgroundColor: '#58a6ff', borderRadius: '2px' }} />
+            <span style={{ color: '#888' }}>Input Tokens</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ width: '12px', height: '12px', backgroundColor: '#3fb950', borderRadius: '2px' }} />
+            <span style={{ color: '#888' }}>Output Tokens</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Active Instances */}
+      {tokenStats.instanceUsage.length > 0 && (
+        <div style={{
+          backgroundColor: '#1a1a1a',
+          border: '1px solid #333',
+          borderRadius: '8px',
+          padding: '24px'
+        }}>
+          <h3 style={{ color: '#fff', margin: 0, marginBottom: '16px', fontSize: '18px' }}>Instance Usage</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {tokenStats.instanceUsage.slice(0, 5).map((instance: any) => (
+              <div key={instance.instanceId} style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '12px',
+                backgroundColor: '#0d1117',
+                borderRadius: '6px',
+                border: '1px solid #21262d'
+              }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ color: '#fff', fontSize: '13px', marginBottom: '2px' }}>
+                    {instance.instanceId.split('-')[0]}...{instance.instanceId.split('-').pop()}
+                  </div>
+                  <div style={{ color: '#888', fontSize: '11px' }}>
+                    Last active: {new Date(instance.lastActivity).toLocaleString()}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ color: '#58a6ff', fontSize: '14px', fontWeight: 'bold' }}>
+                      {instance.inputTokens.toLocaleString()}
+                    </div>
+                    <div style={{ color: '#888', fontSize: '10px' }}>input</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ color: '#3fb950', fontSize: '14px', fontWeight: 'bold' }}>
+                      {instance.outputTokens.toLocaleString()}
+                    </div>
+                    <div style={{ color: '#888', fontSize: '10px' }}>output</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const TerminalPanel: React.FC<TerminalPanelProps> = ({
   selectedWorktree,
   selectedInstance,
@@ -26,18 +554,32 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
 }) => {
   const [claudeTerminalSessionId, setClaudeTerminalSessionId] = useState<string | null>(null);
   const [directoryTerminalSessionId, setDirectoryTerminalSessionId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'claude' | 'directory'>('claude');
+  const [activeTab, setActiveTab] = useState<'claude' | 'directory' | 'git'>('claude');
   const [isCreatingClaudeSession, setIsCreatingClaudeSession] = useState(false);
   const [isCreatingDirectorySession, setIsCreatingDirectorySession] = useState(false);
   const [isRestarting, setIsRestarting] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
   const lastAutoConnectInstance = useRef<string>('');
 
+  // Git state
+  const [gitDiff, setGitDiff] = useState<string>('');
+  const [gitLoading, setGitLoading] = useState(false);
+  const [gitCommitMessage, setGitCommitMessage] = useState<string>('');
+  const [isGeneratingCommit, setIsGeneratingCommit] = useState(false);
+  const [isCommitting, setIsCommitting] = useState(false);
+  const [isReverting, setIsReverting] = useState(false);
+  const [showDenyConfirmation, setShowDenyConfirmation] = useState(false);
+  const [deleteWorktreeOnDeny, setDeleteWorktreeOnDeny] = useState(false);
+  const [diffViewMode, setDiffViewMode] = useState<'unified' | 'split'>('unified');
+
   useEffect(() => {
     // Clear frontend terminal state when switching instances (but keep backend sessions alive)
     console.log(`Switching to instance: ${selectedInstance?.id}, clearing session state`);
     setClaudeTerminalSessionId(null);
     setDirectoryTerminalSessionId(null);
+    // Clear git state when switching
+    setGitDiff('');
+    setGitCommitMessage('');
   }, [selectedInstance?.id]);
 
   // Auto-connect to existing terminal sessions or create new ones when instance first becomes running
@@ -223,20 +765,115 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
     }
   };
 
+  // Git operations
+  const loadGitDiff = async () => {
+    if (!selectedWorktree) return;
+
+    setGitLoading(true);
+    try {
+      const diff = await api.getGitDiff(selectedWorktree.id);
+      setGitDiff(diff);
+    } catch (error) {
+      console.error('Failed to load git diff:', error);
+      setGitDiff('');
+    } finally {
+      setGitLoading(false);
+    }
+  };
+
+  const handleAcceptChanges = async () => {
+    if (!selectedWorktree) return;
+
+    setIsGeneratingCommit(true);
+    try {
+      // Generate commit message using Claude
+      const result = await api.generateCommitMessage(selectedWorktree.id);
+      setGitCommitMessage(result.commitMessage);
+
+      // Auto-commit the changes
+      setIsCommitting(true);
+      await api.commitChanges(selectedWorktree.id, result.commitMessage);
+
+      // Refresh git diff (should be empty now)
+      await loadGitDiff();
+
+      // Optionally create a pull request
+      try {
+        await api.createPullRequest(selectedWorktree.id);
+      } catch (prError) {
+        console.warn('Failed to create pull request:', prError);
+      }
+
+    } catch (error) {
+      console.error('Failed to accept changes:', error);
+    } finally {
+      setIsGeneratingCommit(false);
+      setIsCommitting(false);
+    }
+  };
+
+  const handleDenyChanges = () => {
+    setShowDenyConfirmation(true);
+  };
+
+  const confirmDenyChanges = async () => {
+    if (!selectedWorktree) return;
+
+    setIsReverting(true);
+    try {
+      if (deleteWorktreeOnDeny) {
+        // Comprehensive cleanup: stop instance, revert changes, and delete worktree
+
+        // 1. Stop the Claude instance if running
+        if (selectedInstance) {
+          console.log('Stopping instance before worktree deletion...');
+          await onStopInstance(selectedInstance.id);
+        }
+
+        // 2. Close any terminal sessions
+        if (claudeTerminalSessionId) {
+          onCloseTerminalSession(claudeTerminalSessionId);
+          setClaudeTerminalSessionId(null);
+        }
+        if (directoryTerminalSessionId) {
+          onCloseTerminalSession(directoryTerminalSessionId);
+          setDirectoryTerminalSessionId(null);
+        }
+
+        // 3. Delete the worktree entirely (this also reverts changes)
+        console.log('Deleting worktree...');
+        await onDeleteWorktree(selectedWorktree.id, false);
+
+        // Note: onDeleteWorktree should handle clearing the selection and refreshing data
+      } else {
+        // Just revert changes, keep worktree
+        await api.revertChanges(selectedWorktree.id);
+        await loadGitDiff(); // Should be empty now
+      }
+
+    } catch (error) {
+      console.error('Failed to deny changes:', error);
+    } finally {
+      setIsReverting(false);
+      setShowDenyConfirmation(false);
+      setDeleteWorktreeOnDeny(false); // Reset checkbox state
+    }
+  };
+
+  // Load git diff when switching to git tab
+  useEffect(() => {
+    if (activeTab === 'git' && selectedWorktree) {
+      loadGitDiff();
+    }
+  }, [activeTab, selectedWorktree?.id]);
+
   if (!selectedWorktree) {
     return (
       <div className="right-panel">
         <div className="panel-header">
-          <h3 style={{ margin: 0, color: '#ffffff' }}>Terminal</h3>
+          <h3 style={{ margin: 0, color: '#ffffff' }}>Dashboard</h3>
         </div>
-        <div className="empty-terminal">
-          <div>
-            <h4 style={{ color: '#666', marginBottom: '8px' }}>No worktree selected</h4>
-            <p style={{ color: '#888', fontSize: '14px' }}>
-              Select a worktree from the left panel to view its Claude instance
-            </p>
-          </div>
-        </div>
+        <TokenUsageDashboard />
       </div>
     );
   }
@@ -372,6 +1009,22 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
         >
           Terminal {directoryTerminalSessionId && '●'}
         </button>
+        <button
+          onClick={() => {
+            setActiveTab('git');
+          }}
+          style={{
+            background: activeTab === 'git' ? '#444' : 'transparent',
+            border: 'none',
+            color: '#fff',
+            padding: '12px 24px',
+            cursor: 'pointer',
+            borderBottom: activeTab === 'git' ? '2px solid #007acc' : '2px solid transparent',
+            fontSize: '13px'
+          }}
+        >
+          Git {gitDiff && gitDiff.trim() && '●'}
+        </button>
       </div>
 
       <div className="terminal-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -482,6 +1135,343 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
                 ) : (
                   <div style={{ color: '#888' }}>Connecting...</div>
                 )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Git Tab */}
+        <div style={{
+          display: activeTab === 'git' ? 'flex' : 'none',
+          flexDirection: 'column',
+          flex: 1,
+          minHeight: 0,
+          padding: '16px'
+        }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '16px',
+            borderBottom: '1px solid #444',
+            paddingBottom: '12px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <h4 style={{ color: '#fff', margin: 0 }}>Git Changes</h4>
+              {gitDiff && gitDiff.trim() && (
+                <div style={{
+                  display: 'flex',
+                  backgroundColor: '#21262d',
+                  borderRadius: '6px',
+                  border: '1px solid #30363d',
+                  overflow: 'hidden'
+                }}>
+                  <button
+                    onClick={() => setDiffViewMode('unified')}
+                    style={{
+                      backgroundColor: diffViewMode === 'unified' ? '#0969da' : 'transparent',
+                      border: 'none',
+                      color: diffViewMode === 'unified' ? '#fff' : '#8b949e',
+                      padding: '4px 8px',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      fontWeight: diffViewMode === 'unified' ? 'bold' : 'normal'
+                    }}
+                  >
+                    Unified
+                  </button>
+                  <button
+                    onClick={() => setDiffViewMode('split')}
+                    style={{
+                      backgroundColor: diffViewMode === 'split' ? '#0969da' : 'transparent',
+                      border: 'none',
+                      color: diffViewMode === 'split' ? '#fff' : '#8b949e',
+                      padding: '4px 8px',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      fontWeight: diffViewMode === 'split' ? 'bold' : 'normal'
+                    }}
+                  >
+                    Split
+                  </button>
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {gitDiff && gitDiff.trim() ? (
+                <>
+                  <button
+                    onClick={handleAcceptChanges}
+                    disabled={isGeneratingCommit || isCommitting}
+                    style={{
+                      backgroundColor: '#28a745',
+                      border: 'none',
+                      color: '#fff',
+                      padding: '8px 16px',
+                      borderRadius: '4px',
+                      cursor: isGeneratingCommit || isCommitting ? 'not-allowed' : 'pointer',
+                      fontSize: '13px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      opacity: isGeneratingCommit || isCommitting ? 0.6 : 1
+                    }}
+                  >
+                    {isGeneratingCommit ? (
+                      <>
+                        <div style={{
+                          width: '12px',
+                          height: '12px',
+                          border: '2px solid transparent',
+                          borderTop: '2px solid #fff',
+                          borderRadius: '50%',
+                          animation: 'spin 1s linear infinite'
+                        }} />
+                        Generating...
+                      </>
+                    ) : isCommitting ? (
+                      <>
+                        <div style={{
+                          width: '12px',
+                          height: '12px',
+                          border: '2px solid transparent',
+                          borderTop: '2px solid #fff',
+                          borderRadius: '50%',
+                          animation: 'spin 1s linear infinite'
+                        }} />
+                        Committing...
+                      </>
+                    ) : (
+                      '✅ Accept Changes'
+                    )}
+                  </button>
+                  <button
+                    onClick={handleDenyChanges}
+                    disabled={isReverting}
+                    style={{
+                      backgroundColor: '#dc3545',
+                      border: 'none',
+                      color: '#fff',
+                      padding: '8px 16px',
+                      borderRadius: '4px',
+                      cursor: isReverting ? 'not-allowed' : 'pointer',
+                      fontSize: '13px',
+                      opacity: isReverting ? 0.6 : 1
+                    }}
+                  >
+                    ❌ Deny Changes
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={loadGitDiff}
+                  disabled={gitLoading}
+                  style={{
+                    backgroundColor: '#007acc',
+                    border: 'none',
+                    color: '#fff',
+                    padding: '8px 16px',
+                    borderRadius: '4px',
+                    cursor: gitLoading ? 'not-allowed' : 'pointer',
+                    fontSize: '13px',
+                    opacity: gitLoading ? 0.6 : 1
+                  }}
+                >
+                  {gitLoading ? 'Loading...' : '🔄 Refresh'}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {gitLoading ? (
+            <div style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#888'
+            }}>
+              Loading git changes...
+            </div>
+          ) : gitDiff && gitDiff.trim() ? (
+            <div style={{ flex: 1, overflow: 'auto' }}>
+              {diffViewMode === 'unified' ? (
+                <UnifiedDiffView gitDiff={gitDiff} />
+              ) : (
+                <SplitDiffView gitDiff={gitDiff} />
+              )}
+              {gitCommitMessage && (
+                <div style={{ marginTop: '16px' }}>
+                  <h5 style={{ color: '#fff', marginBottom: '8px' }}>Generated Commit Message:</h5>
+                  <pre style={{
+                    background: '#2d3748',
+                    border: '1px solid #4a5568',
+                    borderRadius: '4px',
+                    padding: '8px',
+                    color: '#a0aec0',
+                    fontSize: '12px',
+                    fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace',
+                    whiteSpace: 'pre-wrap',
+                    margin: 0
+                  }}>
+                    {gitCommitMessage}
+                  </pre>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexDirection: 'column',
+              color: '#888'
+            }}>
+              <div style={{ fontSize: '48px', marginBottom: '16px', opacity: 0.5 }}>📝</div>
+              <h4 style={{ color: '#666', marginBottom: '8px' }}>No Changes</h4>
+              <p style={{ color: '#888', fontSize: '14px', textAlign: 'center' }}>
+                Your worktree is clean. Make some changes and they'll appear here.
+              </p>
+            </div>
+          )}
+
+          {/* Denial Confirmation Modal */}
+          {showDenyConfirmation && (
+            <div style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000
+            }}>
+              <div style={{
+                backgroundColor: '#2d3748',
+                border: '1px solid #4a5568',
+                borderRadius: '8px',
+                padding: '24px',
+                minWidth: '450px',
+                maxWidth: '550px'
+              }}>
+                <h3 style={{ color: '#fff', marginBottom: '16px', marginTop: 0 }}>
+                  ⚠️ Confirm Deny Changes
+                </h3>
+                <p style={{ color: '#a0aec0', marginBottom: '16px', lineHeight: '1.5' }}>
+                  Choose how to handle the denial of changes:
+                </p>
+
+                {/* Option Selection */}
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '8px',
+                    marginBottom: '12px',
+                    cursor: 'pointer',
+                    padding: '8px',
+                    borderRadius: '4px',
+                    backgroundColor: !deleteWorktreeOnDeny ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                    border: !deleteWorktreeOnDeny ? '1px solid #3b82f6' : '1px solid transparent'
+                  }}>
+                    <input
+                      type="radio"
+                      name="denyOption"
+                      checked={!deleteWorktreeOnDeny}
+                      onChange={() => setDeleteWorktreeOnDeny(false)}
+                      style={{ marginTop: '2px' }}
+                    />
+                    <div>
+                      <div style={{ color: '#fff', fontWeight: 'bold', marginBottom: '4px' }}>
+                        🔄 Revert Changes Only
+                      </div>
+                      <div style={{ color: '#a0aec0', fontSize: '13px' }}>
+                        Reset all files to their last committed state, but keep the worktree and instance running.
+                      </div>
+                    </div>
+                  </label>
+
+                  <label style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '8px',
+                    cursor: 'pointer',
+                    padding: '8px',
+                    borderRadius: '4px',
+                    backgroundColor: deleteWorktreeOnDeny ? 'rgba(239, 68, 68, 0.1)' : 'transparent',
+                    border: deleteWorktreeOnDeny ? '1px solid #ef4444' : '1px solid transparent'
+                  }}>
+                    <input
+                      type="radio"
+                      name="denyOption"
+                      checked={deleteWorktreeOnDeny}
+                      onChange={() => setDeleteWorktreeOnDeny(true)}
+                      style={{ marginTop: '2px' }}
+                    />
+                    <div>
+                      <div style={{ color: '#fff', fontWeight: 'bold', marginBottom: '4px' }}>
+                        🗑️ Delete Entire Worktree
+                      </div>
+                      <div style={{ color: '#a0aec0', fontSize: '13px' }}>
+                        Stop the instance, close terminals, and completely remove this worktree and all its contents.
+                      </div>
+                    </div>
+                  </label>
+                </div>
+
+                <div style={{
+                  color: deleteWorktreeOnDeny ? '#ef4444' : '#f59e0b',
+                  fontSize: '13px',
+                  marginBottom: '20px',
+                  padding: '8px',
+                  backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                  borderRadius: '4px',
+                  fontWeight: 'bold'
+                }}>
+                  ⚠️ {deleteWorktreeOnDeny ? 'This will permanently delete the entire worktree!' : 'This will permanently revert all changes!'}
+                </div>
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                  <button
+                    onClick={() => {
+                      setShowDenyConfirmation(false);
+                      setDeleteWorktreeOnDeny(false); // Reset checkbox when cancelling
+                    }}
+                    style={{
+                      backgroundColor: 'transparent',
+                      border: '1px solid #4a5568',
+                      color: '#a0aec0',
+                      padding: '8px 16px',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmDenyChanges}
+                    disabled={isReverting}
+                    style={{
+                      backgroundColor: deleteWorktreeOnDeny ? '#dc3545' : '#f59e0b',
+                      border: 'none',
+                      color: '#fff',
+                      padding: '8px 16px',
+                      borderRadius: '4px',
+                      cursor: isReverting ? 'not-allowed' : 'pointer',
+                      fontSize: '14px',
+                      opacity: isReverting ? 0.6 : 1
+                    }}
+                  >
+                    {isReverting
+                      ? (deleteWorktreeOnDeny ? 'Deleting Worktree...' : 'Reverting Changes...')
+                      : (deleteWorktreeOnDeny ? 'Yes, Delete Worktree' : 'Yes, Revert Changes')
+                    }
+                  </button>
+                </div>
               </div>
             </div>
           )}
