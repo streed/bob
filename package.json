@@ -4,6 +4,8 @@
   "description": "Bob - Web app for managing multiple Claude Code instances with git worktree support",
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:clean": "lsof -ti:5173 | xargs -r kill -9; lsof -ti:3001 | xargs -r kill -9; npm run dev",
+    "dev:stop": "lsof -ti:5173 | xargs -r kill -9; lsof -ti:3001 | xargs -r kill -9",
     "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd frontend && npm run dev",
     "build": "npm run build:backend && npm run build:frontend",
