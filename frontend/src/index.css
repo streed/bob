@@ -39,6 +39,25 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: width 0.3s ease;
+}
+
+.left-panel.collapsed {
+  width: 60px;
+}
+
+.collapsed-content {
+  padding: 12px 8px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.collapsed-worktree-item:hover {
+  background: #333 !important;
+}
+
+.collapse-toggle-btn:hover {
+  background: #333 !important;
 }
 
 .right-panel {
