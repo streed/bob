@@ -80,10 +80,10 @@ function App() {
     }
   };
 
-  const handleCreateWorktreeAndStartInstance = async (repositoryId: string, branchName: string) => {
+  const handleCreateWorktreeAndStartInstance = async (repositoryId: string, branchName: string, provider: 'claude' | 'codex' = 'claude') => {
     try {
       const worktree = await api.createWorktree(repositoryId, branchName);
-      await api.startInstance(worktree.id);
+      await api.startInstance(worktree.id, provider);
       await loadData();
       setSelectedWorktreeId(worktree.id);
       setError(null);
