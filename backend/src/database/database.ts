@@ -57,8 +57,8 @@ export class DatabaseService {
   // Repository methods
   async saveRepository(repo: Repository): Promise<void> {
     await this.run(
-      `INSERT OR REPLACE INTO repositories (id, name, path, branch) VALUES (?, ?, ?, ?)`,
-      [repo.id, repo.name, repo.path, repo.branch]
+      `INSERT OR REPLACE INTO repositories (id, name, path, branch, main_branch) VALUES (?, ?, ?, ?, ?)`,
+      [repo.id, repo.name, repo.path, repo.branch, repo.mainBranch]
     );
   }
 
@@ -74,6 +74,7 @@ export class DatabaseService {
       name: row.name,
       path: row.path,
       branch: row.branch,
+      mainBranch: row.main_branch || row.branch, // Fallback to current branch if main_branch is null
       worktrees
     };
   }
@@ -86,6 +87,7 @@ export class DatabaseService {
       name: row.name,
       path: row.path,
       branch: row.branch,
+      mainBranch: row.main_branch || row.branch, // Fallback to current branch if main_branch is null
       worktrees: await this.getWorktreesByRepository(row.id)
     })));
 
@@ -99,8 +101,8 @@ export class DatabaseService {
   // Worktree methods
   async saveWorktree(worktree: Worktree): Promise<void> {
     await this.run(
-      `INSERT OR REPLACE INTO worktrees (id, repository_id, path, branch, is_main_worktree) VALUES (?, ?, ?, ?, ?)`,
-      [worktree.id, worktree.repositoryId, worktree.path, worktree.branch, worktree.isMainWorktree ? 1 : 0]
+      `INSERT OR REPLACE INTO worktrees (id, repository_id, path, branch) VALUES (?, ?, ?, ?)`,
+      [worktree.id, worktree.repositoryId, worktree.path, worktree.branch]
     );
   }
 
@@ -117,7 +119,7 @@ export class DatabaseService {
       path: row.path,
       branch: row.branch,
       instances,
-      isMainWorktree: Boolean(row.is_main_worktree)
+      isMainWorktree: false // All worktrees in the database are non-main worktrees
     };
   }
 
@@ -130,7 +132,7 @@ export class DatabaseService {
       path: row.path,
       branch: row.branch,
       instances: await this.getInstancesByWorktree(row.id),
-      isMainWorktree: Boolean(row.is_main_worktree)
+      isMainWorktree: false // All worktrees in the database are non-main worktrees
     })));
 
     return worktrees;

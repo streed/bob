@@ -47,6 +47,12 @@ class ApiClient {
     });
   }
 
+  async refreshMainBranch(repositoryId: string): Promise<Repository> {
+    return this.request(`/repositories/${repositoryId}/refresh-main`, {
+      method: 'POST',
+    });
+  }
+
   async checkWorktreeMergeStatus(worktreeId: string): Promise<{ isMerged: boolean; targetBranch: string }> {
     return this.request(`/repositories/worktrees/${worktreeId}/merge-status`);
   }

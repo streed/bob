@@ -55,6 +55,7 @@ export class GitService {
     try {
       const { stdout: branchOutput } = await execAsync('git branch --show-current', { cwd: repoPath });
       const currentBranch = branchOutput.trim();
+      const mainBranch = await this.detectMainBranch(repoPath);
 
       const repoId = Buffer.from(repoPath).toString('base64');
       const repo: Repository = {
@@ -62,6 +63,7 @@ export class GitService {
         name: basename(repoPath),
         path: repoPath,
         branch: currentBranch,
+        mainBranch: mainBranch,
         worktrees: []
       };
 
@@ -72,6 +74,53 @@ export class GitService {
     } catch (error) {
       console.error(`Error creating repository from ${repoPath}:`, error);
       return null;
+    }
+  }
+
+  private async detectMainBranch(repoPath: string): Promise<string> {
+    try {
+      // First try to get the default branch from the remote
+      try {
+        const { stdout: defaultBranch } = await execAsync('git symbolic-ref refs/remotes/origin/HEAD', { cwd: repoPath });
+        const branch = defaultBranch.trim().replace('refs/remotes/origin/', '');
+        if (branch) return branch;
+      } catch {
+        // If that fails, try to determine from existing branches
+      }
+
+      // Check if 'main' exists
+      try {
+        await execAsync('git show-ref --verify --quiet refs/heads/main', { cwd: repoPath });
+        return 'main';
+      } catch {
+        // 'main' doesn't exist, try 'master'
+      }
+
+      // Check if 'master' exists
+      try {
+        await execAsync('git show-ref --verify --quiet refs/heads/master', { cwd: repoPath });
+        return 'master';
+      } catch {
+        // Neither main nor master exists, try other common names
+      }
+
+      // Try other common main branch names
+      const commonNames = ['develop', 'development', 'dev'];
+      for (const name of commonNames) {
+        try {
+          await execAsync(`git show-ref --verify --quiet refs/heads/${name}`, { cwd: repoPath });
+          return name;
+        } catch {
+          continue;
+        }
+      }
+
+      // Fallback: get the current HEAD branch
+      const { stdout: currentBranch } = await execAsync('git branch --show-current', { cwd: repoPath });
+      return currentBranch.trim() || 'main';
+    } catch (error) {
+      console.error(`Error detecting main branch for ${repoPath}:`, error);
+      return 'main'; // Safe fallback
     }
   }
 
@@ -329,5 +378,37 @@ export class GitService {
 
   getWorktreesByRepository(repositoryId: string): Worktree[] {
     return Array.from(this.worktrees.values()).filter(w => w.repositoryId === repositoryId);
+  }
+
+  async refreshMainBranch(repositoryId: string): Promise<Repository> {
+    const repository = this.repositories.get(repositoryId);
+    if (!repository) {
+      throw new Error(`Repository ${repositoryId} not found`);
+    }
+
+    try {
+      // Fetch latest changes from remote
+      await execAsync('git fetch origin', { cwd: repository.path });
+
+      // Pull the main branch to keep it up to date
+      await execAsync(`git checkout ${repository.mainBranch}`, { cwd: repository.path });
+      await execAsync(`git pull origin ${repository.mainBranch}`, { cwd: repository.path });
+
+      // Update the current branch info
+      const { stdout: branchOutput } = await execAsync('git branch --show-current', { cwd: repository.path });
+      repository.branch = branchOutput.trim();
+
+      // Re-detect main branch in case it changed
+      repository.mainBranch = await this.detectMainBranch(repository.path);
+
+      // Update database
+      await this.db.saveRepository(repository);
+
+      console.log(`Successfully refreshed main branch for repository ${repository.name}`);
+      return repository;
+    } catch (error) {
+      console.error(`Error refreshing main branch for ${repository.name}:`, error);
+      throw new Error(`Failed to refresh main branch: ${error instanceof Error ? error.message : error}`);
+    }
   }
 }

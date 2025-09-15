@@ -127,6 +127,16 @@ function MainApp() {
     }
   };
 
+  const handleRefreshMainBranch = async (repositoryId: string) => {
+    try {
+      await api.refreshMainBranch(repositoryId);
+      await loadData();
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to refresh main branch');
+    }
+  };
+
   const handleStartInstance = async (worktreeId: string) => {
     try {
       await api.startInstance(worktreeId);
@@ -323,6 +333,7 @@ function MainApp() {
           onCreateWorktreeAndStartInstance={handleCreateWorktreeAndStartInstance}
           onSelectWorktree={handleSelectWorktree}
           onDeleteWorktree={handleDeleteWorktree}
+          onRefreshMainBranch={handleRefreshMainBranch}
           isCollapsed={isLeftPanelCollapsed}
           onToggleCollapse={toggleLeftPanel}
         />
