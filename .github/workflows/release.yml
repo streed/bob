@@ -173,8 +173,13 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm run install:dependencies
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies (macOS)
+        run: npm run install:dependencies:mac
 
       - name: Build for macOS
         run: npm run dist:mac
