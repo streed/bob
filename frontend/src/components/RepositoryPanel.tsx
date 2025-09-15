@@ -46,21 +46,21 @@ export const RepositoryPanel: React.FC<RepositoryPanelProps> = ({
 
   const getWorktreeStatus = (worktree: Worktree) => {
     const worktreeInstances = instances.filter(i => i.worktreeId === worktree.id);
-    if (worktreeInstances.length === 0) return { status: 'none', label: 'No Instance' };
+    if (worktreeInstances.length === 0) return { status: 'none', label: 'No Instance', provider: null };
     
     // Since we enforce single instance per worktree, just get the first (and only) instance
     const instance = worktreeInstances[0];
     
     switch (instance.status) {
       case 'running':
-        return { status: 'running', label: 'Running' };
+        return { status: 'running', label: 'Running', provider: instance.provider || 'claude' };
       case 'starting':
-        return { status: 'starting', label: 'Starting' };
+        return { status: 'starting', label: 'Starting', provider: instance.provider || 'claude' };
       case 'error':
-        return { status: 'error', label: 'Error' };
+        return { status: 'error', label: 'Error', provider: instance.provider || 'claude' };
       case 'stopped':
       default:
-        return { status: 'stopped', label: 'Stopped' };
+        return { status: 'stopped', label: 'Stopped', provider: instance.provider || 'claude' };
     }
   };
 
@@ -227,7 +227,22 @@ export const RepositoryPanel: React.FC<RepositoryPanelProps> = ({
                           >
                             <div className="worktree-info">
                               <div className="worktree-name">{getBranchDisplayName(worktree.branch)}</div>
-                              <div className="worktree-path">{worktree.path}</div>
+                              <div className="worktree-path">
+                                {worktree.path}
+                                {status.provider && (
+                                  <span style={{
+                                    marginLeft: '8px',
+                                    fontSize: '10px',
+                                    backgroundColor: status.provider === 'codex' ? '#0066cc' : '#ff6600',
+                                    color: '#fff',
+                                    padding: '2px 6px',
+                                    borderRadius: '3px',
+                                    textTransform: 'uppercase'
+                                  }}>
+                                    {status.provider}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                             <div
                               className={`instance-status ${isStarting ? 'starting' : status.status}`}

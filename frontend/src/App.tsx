@@ -95,9 +95,22 @@ function App() {
     }
   };
 
-  const handleStartInstance = async (worktreeId: string) => {
+  const getPreferredProviderForWorktree = (worktreeId: string): 'claude' | 'codex' => {
+    // Check if there was a previous instance for this worktree
+    const previousInstance = instances.find(instance => instance.worktreeId === worktreeId);
+    if (previousInstance && previousInstance.provider) {
+      return previousInstance.provider;
+    }
+    
+    // Default to claude if no previous instance found
+    return 'claude';
+  };
+
+  const handleStartInstance = async (worktreeId: string, provider?: 'claude' | 'codex') => {
     try {
-      await api.startInstance(worktreeId);
+      // If no provider specified, determine the preferred provider for this worktree
+      const selectedProvider = provider || getPreferredProviderForWorktree(worktreeId);
+      await api.startInstance(worktreeId, selectedProvider);
       await loadData();
       setError(null);
     } catch (err) {
