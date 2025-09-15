@@ -753,6 +753,14 @@ body {
   background: #333;
 }
 
+.data-table tr.selected-row {
+  background: #2a4a3a !important;
+}
+
+.data-table tr.selected-row:hover {
+  background: #345242 !important;
+}
+
 .pagination {
   display: flex;
   justify-content: center;

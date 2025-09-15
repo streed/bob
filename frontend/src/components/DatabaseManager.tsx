@@ -30,6 +30,7 @@ export function DatabaseManager() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     if (isWarningAccepted) {
@@ -41,6 +42,7 @@ export function DatabaseManager() {
     if (selectedTable) {
       loadTableSchema();
       loadTableData(1);
+      setSelectedRows(new Set()); // Clear row selection when table changes
     }
   }, [selectedTable]);
 
@@ -76,6 +78,7 @@ export function DatabaseManager() {
       const data = await api.getTableData(selectedTable, page, 50);
       setTableData(data);
       setCurrentPage(page);
+      setSelectedRows(new Set()); // Clear row selection when page changes
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load table data');
@@ -121,6 +124,68 @@ export function DatabaseManager() {
     }
   };
 
+  const deleteSelectedRowsById = async () => {
+    if (selectedRows.size === 0) {
+      setError('No rows selected for deletion');
+      return;
+    }
+
+    if (!tableData || !selectedTable) return;
+
+    // Find the primary key column
+    const pkColumn = tableSchema.find(col => col.pk === 1);
+    if (!pkColumn) {
+      setError('Cannot delete rows: No primary key found in table schema');
+      return;
+    }
+
+    // Get the IDs of selected rows
+    const selectedIds = Array.from(selectedRows).map(rowIndex => {
+      const row = tableData.data[rowIndex];
+      return row[pkColumn.name];
+    });
+
+    const confirmed = confirm(`This will DELETE ${selectedIds.length} selected rows from ${selectedTable}. This action cannot be undone. Continue?`);
+    if (!confirmed) return;
+
+    try {
+      setLoading(true);
+      const whereClause = `${pkColumn.name} IN (${selectedIds.map(id => typeof id === 'string' ? `'${id}'` : id).join(', ')})`;
+      const result = await api.deleteRows(selectedTable, whereClause, true);
+      setSuccess(result.message);
+      setSelectedRows(new Set());
+      loadTableData(currentPage);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete selected rows');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleRowSelection = (rowIndex: number) => {
+    const newSelection = new Set(selectedRows);
+    if (newSelection.has(rowIndex)) {
+      newSelection.delete(rowIndex);
+    } else {
+      newSelection.add(rowIndex);
+    }
+    setSelectedRows(newSelection);
+  };
+
+  const toggleAllRows = () => {
+    if (!tableData) return;
+    
+    if (selectedRows.size === tableData.data.length) {
+      // All rows are selected, deselect all
+      setSelectedRows(new Set());
+    } else {
+      // Select all rows on current page
+      const allRowIndices = new Set(tableData.data.map((_, index) => index));
+      setSelectedRows(allRowIndices);
+    }
+  };
+
   const updateSelectedRows = async () => {
     const setClause = prompt('Enter SET clause for UPDATE operation (e.g., status = "stopped"):');
     if (!setClause) return;
@@ -150,6 +215,8 @@ export function DatabaseManager() {
     }
 
     const columns = Object.keys(tableData.data[0]);
+    const pkColumn = tableSchema.find(col => col.pk === 1);
+    const canDelete = !!pkColumn; // Can only delete rows if there's a primary key
 
     return (
       <div className="table-container">
@@ -160,8 +227,17 @@ export function DatabaseManager() {
               Update Rows
             </button>
             <button onClick={deleteSelectedRows} className="button-danger">
-              Delete Rows
+              Delete Rows (WHERE)
             </button>
+            {canDelete && (
+              <button 
+                onClick={deleteSelectedRowsById} 
+                className="button-danger"
+                disabled={selectedRows.size === 0}
+              >
+                Delete Selected ({selectedRows.size})
+              </button>
+            )}
           </div>
         </div>
         
@@ -169,6 +245,16 @@ export function DatabaseManager() {
           <table className="data-table">
             <thead>
               <tr>
+                {canDelete && (
+                  <th style={{ width: '40px' }}>
+                    <input
+                      type="checkbox"
+                      checked={tableData.data.length > 0 && selectedRows.size === tableData.data.length}
+                      onChange={toggleAllRows}
+                      title="Select all rows"
+                    />
+                  </th>
+                )}
                 {columns.map(col => (
                   <th key={col}>{col}</th>
                 ))}
@@ -176,7 +262,16 @@ export function DatabaseManager() {
             </thead>
             <tbody>
               {tableData.data.map((row, index) => (
-                <tr key={index}>
+                <tr key={index} className={selectedRows.has(index) ? 'selected-row' : ''}>
+                  {canDelete && (
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={selectedRows.has(index)}
+                        onChange={() => toggleRowSelection(index)}
+                      />
+                    </td>
+                  )}
                   {columns.map(col => (
                     <td key={col} title={String(row[col])}>
                       {String(row[col])}

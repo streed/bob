@@ -1,24 +1,43 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Routes, Route, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { Repository, ClaudeInstance, Worktree } from './types';
 import { api } from './api';
 import { RepositoryPanel } from './components/RepositoryPanel';
 import { TerminalPanel } from './components/TerminalPanel';
 import { DatabaseManager } from './components/DatabaseManager';
+import { useCheatCode } from './contexts/CheatCodeContext';
 
 function App() {
   return (
     <Routes>
       <Route path="/" element={<MainApp />} />
-      <Route path="/database" element={<DatabaseManager />} />
+      <Route path="/database" element={<DatabaseRoute />} />
     </Routes>
   );
+}
+
+function DatabaseRoute() {
+  const { isDatabaseUnlocked } = useCheatCode();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!isDatabaseUnlocked) {
+      navigate('/');
+    }
+  }, [isDatabaseUnlocked, navigate]);
+
+  if (!isDatabaseUnlocked) {
+    return null;
+  }
+
+  return <DatabaseManager />;
 }
 
 function MainApp() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const { isDatabaseUnlocked } = useCheatCode();
 
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [instances, setInstances] = useState<ClaudeInstance[]>([]);
@@ -281,12 +300,14 @@ function MainApp() {
               >
                 Home
               </button>
-              <button
-                onClick={() => navigate('/database')}
-                className={`nav-button ${location.pathname === '/database' ? 'active' : ''}`}
-              >
-                Database
-              </button>
+              {isDatabaseUnlocked && (
+                <button
+                  onClick={() => navigate('/database')}
+                  className={`nav-button ${location.pathname === '/database' ? 'active' : ''}`}
+                >
+                  Database
+                </button>
+              )}
             </nav>
           </div>
         </div>
