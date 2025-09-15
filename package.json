@@ -3,7 +3,10 @@
   "version": "0.0.1",
   "description": "Bob - Claude Code Manager Desktop App",
   "main": "electron/main.js",
-  "author": "Bob Team",
+  "author": {
+    "name": "Bob Team",
+    "email": "bob@reedster.llc"
+  },
   "license": "GPL-3.0",
   "homepage": "https://github.com/your-org/bob",
   "scripts": {
