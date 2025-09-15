@@ -136,8 +136,11 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm run install:dependencies
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Install dependencies (Windows)
+        run: npm run install:dependencies:win
 
       - name: Build for Windows
         run: npm run dist:win
