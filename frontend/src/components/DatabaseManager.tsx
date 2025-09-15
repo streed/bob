@@ -373,7 +373,12 @@ export function DatabaseManager() {
       <div className="database-header">
         <h2>Database Management</h2>
         <button 
-          onClick={() => navigate('/?fromDatabase=true')}
+          onClick={() => {
+            // Primary approach: dispatch a custom event for immediate refresh
+            window.dispatchEvent(new CustomEvent('databaseRefreshRequested'));
+            // Fallback approach: use URL parameter for compatibility
+            navigate('/?fromDatabase=true');
+          }}
           className="button-secondary"
         >
           Exit Database Manager

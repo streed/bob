@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Routes, Route, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { Repository, ClaudeInstance, Worktree } from './types';
 import { api } from './api';
@@ -38,6 +38,7 @@ function MainApp() {
   const navigate = useNavigate();
   const location = useLocation();
   const { isDatabaseUnlocked } = useCheatCode();
+  const refreshRequested = useRef(false);
 
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [instances, setInstances] = useState<ClaudeInstance[]>([]);
@@ -53,10 +54,23 @@ function MainApp() {
     return () => clearInterval(interval);
   }, []);
 
-  // Refresh data when returning to main app (e.g., from database page)
+  // Listen for database refresh events
+  useEffect(() => {
+    const handleDatabaseRefresh = () => {
+      loadData();
+    };
+
+    window.addEventListener('databaseRefreshRequested', handleDatabaseRefresh);
+    return () => {
+      window.removeEventListener('databaseRefreshRequested', handleDatabaseRefresh);
+    };
+  }, []);
+
+  // Fallback: URL parameter approach for data refresh when returning from database
   useEffect(() => {
     const fromDatabase = searchParams.get('fromDatabase');
-    if (location.pathname === '/' && fromDatabase === 'true') {
+    if (location.pathname === '/' && fromDatabase === 'true' && !refreshRequested.current) {
+      refreshRequested.current = true;
       // Immediately refresh data when returning from database page
       loadData();
       // Remove the parameter from URL after processing
@@ -65,6 +79,10 @@ function MainApp() {
         newParams.delete('fromDatabase');
         return newParams;
       });
+      // Reset flag after a short delay
+      setTimeout(() => {
+        refreshRequested.current = false;
+      }, 1000);
     }
   }, [location, searchParams, setSearchParams]);
 
