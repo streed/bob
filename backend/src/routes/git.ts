@@ -370,7 +370,7 @@ router.post('/:worktreeId/create-pr', async (req, res) => {
       const titlePrompt = `Based on this git diff and commit history, generate a concise PR title that follows conventional commit format. Keep it under 72 characters. Types: feat, fix, docs, style, refactor, test, chore. Only return the title.`;
 
       const diffAndCommits = `${diff}\n\nCommits:\n${commits}`;
-      const claudeTitleOutput = await callLLM(titlePrompt, diffAndCommits, worktree.path);
+      const claudeTitleOutput = await callLLM(titlePrompt, diffAndCommits, worktree.path, getWorktreeProvider(worktreeId, req));
 
       if (claudeTitleOutput) {
         prTitle = claudeTitleOutput;
@@ -383,7 +383,7 @@ router.post('/:worktreeId/create-pr', async (req, res) => {
 3. ## Testing - How to test these changes
 4. Use markdown formatting. Be detailed but concise.`;
 
-      const claudeDescOutput = await callLLM(descPrompt, diffAndCommits, worktree.path);
+      const claudeDescOutput = await callLLM(descPrompt, diffAndCommits, worktree.path, getWorktreeProvider(worktreeId, req));
 
       if (claudeDescOutput) {
         prDescription = `${claudeDescOutput}\n\n🤖 Generated with Claude Code`;
@@ -474,7 +474,7 @@ router.post('/:worktreeId/update-pr', async (req, res) => {
       const titlePrompt = `Based on this git diff and commit history, generate a concise PR title that follows conventional commit format. Keep it under 72 characters. Types: feat, fix, docs, style, refactor, test, chore. Only return the title.`;
 
       const diffAndCommits = `${diff}\n\nCommits:\n${commits}`;
-      const claudeTitleOutput = await callLLM(titlePrompt, diffAndCommits, worktree.path);
+      const claudeTitleOutput = await callLLM(titlePrompt, diffAndCommits, worktree.path, getWorktreeProvider(worktreeId, req));
 
       if (claudeTitleOutput) {
         prTitle = claudeTitleOutput;
@@ -487,7 +487,7 @@ router.post('/:worktreeId/update-pr', async (req, res) => {
 3. ## Testing - How to test these changes
 4. Use markdown formatting. Be detailed but concise.`;
 
-      const claudeDescOutput = await callLLM(descPrompt, diffAndCommits, worktree.path);
+      const claudeDescOutput = await callLLM(descPrompt, diffAndCommits, worktree.path, getWorktreeProvider(worktreeId, req));
 
       if (claudeDescOutput) {
         prDescription = `${claudeDescOutput}\n\n🤖 Generated with Claude Code`;
@@ -602,7 +602,7 @@ Return a JSON object with this structure:
 
 Only include substantive comments that add value. Be concise but helpful.`;
 
-      const analysisResult = await callLLM(analysisPrompt, completeDiff, worktree.path);
+      const analysisResult = await callLLM(analysisPrompt, completeDiff, worktree.path, getWorktreeProvider(worktreeId, req));
 
       let parsedResult;
       try {
@@ -932,7 +932,7 @@ ${(fileComments as any[]).map((c: any) =>
 Return only the complete file content with the requested improvements applied.`;
 
         console.log(`Applying fixes to ${filePath}...`);
-        const fixedContent = await callLLM(fileFixPrompt, originalContent, worktree.path);
+        const fixedContent = await callLLM(fileFixPrompt, originalContent, worktree.path, getWorktreeProvider(worktreeId, req));
 
         // Only apply changes if the content actually changed
         if (fixedContent && fixedContent.trim() !== originalContent.trim()) {

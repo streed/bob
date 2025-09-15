@@ -65,10 +65,10 @@ class ApiClient {
     return this.request(`/instances/repository/${repositoryId}`);
   }
 
-  async startInstance(worktreeId: string): Promise<ClaudeInstance> {
+  async startInstance(worktreeId: string, provider: 'claude' | 'codex' = 'claude'): Promise<ClaudeInstance> {
     return this.request('/instances', {
       method: 'POST',
-      body: JSON.stringify({ worktreeId }),
+      body: JSON.stringify({ worktreeId, provider }),
     });
   }
 
@@ -254,6 +254,10 @@ class ApiClient {
   // System status and metrics
   async getSystemStatus(): Promise<{
     claude: {
+      status: 'available' | 'not_available' | 'unknown';
+      version: string;
+    };
+    codex: {
       status: 'available' | 'not_available' | 'unknown';
       version: string;
     };
