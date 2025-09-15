@@ -10,6 +10,7 @@ import { DatabaseService } from './database/database.js';
 import { createRepositoryRoutes } from './routes/repositories.js';
 import { createInstanceRoutes } from './routes/instances.js';
 import { createFilesystemRoutes } from './routes/filesystem.js';
+import { createDatabaseRoutes } from './routes/database.js';
 import gitRoutes from './routes/git.js';
 
 const app = express();
@@ -35,6 +36,7 @@ console.log('Services initialized');
 app.use('/api/repositories', createRepositoryRoutes(gitService, claudeService));
 app.use('/api/instances', createInstanceRoutes(claudeService, terminalService, gitService));
 app.use('/api/filesystem', createFilesystemRoutes());
+app.use('/api/database', createDatabaseRoutes(db));
 
 // Make services available to git routes
 app.locals.gitService = gitService;

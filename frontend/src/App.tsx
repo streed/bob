@@ -1,12 +1,24 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Routes, Route, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { Repository, ClaudeInstance, Worktree } from './types';
 import { api } from './api';
 import { RepositoryPanel } from './components/RepositoryPanel';
 import { TerminalPanel } from './components/TerminalPanel';
+import { DatabaseManager } from './components/DatabaseManager';
 
 function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<MainApp />} />
+      <Route path="/database" element={<DatabaseManager />} />
+    </Routes>
+  );
+}
+
+function MainApp() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [instances, setInstances] = useState<ClaudeInstance[]>([]);
@@ -244,21 +256,40 @@ function App() {
   return (
     <div className="container">
       <div className="header">
-        <h1
-          onClick={() => {
-            setSelectedWorktreeId(null);
-            setSearchParams({});
-          }}
-          style={{
-            cursor: 'pointer',
-            transition: 'color 0.2s ease',
-            margin: 0
-          }}
-          onMouseEnter={(e) => (e.target as HTMLElement).style.color = '#58a6ff'}
-          onMouseLeave={(e) => (e.target as HTMLElement).style.color = ''}
-        >
-          Bob
-        </h1>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+            <h1
+              onClick={() => {
+                setSelectedWorktreeId(null);
+                setSearchParams({});
+                navigate('/');
+              }}
+              style={{
+                cursor: 'pointer',
+                transition: 'color 0.2s ease',
+                margin: 0
+              }}
+              onMouseEnter={(e) => (e.target as HTMLElement).style.color = '#58a6ff'}
+              onMouseLeave={(e) => (e.target as HTMLElement).style.color = ''}
+            >
+              Bob
+            </h1>
+            <nav style={{ display: 'flex', gap: '16px' }}>
+              <button
+                onClick={() => navigate('/')}
+                className={`nav-button ${location.pathname === '/' ? 'active' : ''}`}
+              >
+                Home
+              </button>
+              <button
+                onClick={() => navigate('/database')}
+                className={`nav-button ${location.pathname === '/database' ? 'active' : ''}`}
+              >
+                Database
+              </button>
+            </nav>
+          </div>
+        </div>
         <p>Manage multiple Claude Code instances across git repositories and worktrees</p>
       </div>
 

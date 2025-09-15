@@ -439,6 +439,41 @@ export class DatabaseService {
     );
   }
 
+  // Database administration methods
+  async getAllTables(): Promise<string[]> {
+    const result = await this.all(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+    );
+    return result.map(row => row.name);
+  }
+
+  async getTableSchema(tableName: string): Promise<any[]> {
+    return await this.all(`PRAGMA table_info(${tableName})`);
+  }
+
+  async getTableData(tableName: string, limit: number = 50, offset: number = 0): Promise<any[]> {
+    return await this.all(`SELECT * FROM ${tableName} LIMIT ? OFFSET ?`, [limit, offset]);
+  }
+
+  async getTableCount(tableName: string): Promise<number> {
+    const result = await this.get(`SELECT COUNT(*) as count FROM ${tableName}`);
+    return result.count;
+  }
+
+  async executeQuery(sql: string): Promise<any[]> {
+    return await this.all(sql);
+  }
+
+  async deleteRows(tableName: string, whereClause: string): Promise<number> {
+    const result = await this.run(`DELETE FROM ${tableName} WHERE ${whereClause}`);
+    return result.changes || 0;
+  }
+
+  async updateRows(tableName: string, setClause: string, whereClause: string): Promise<number> {
+    const result = await this.run(`UPDATE ${tableName} SET ${setClause} WHERE ${whereClause}`);
+    return result.changes || 0;
+  }
+
   close(): void {
     this.db.close();
   }
