@@ -1,0 +1,190 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on version tags like v0.0.1, v1.0.0, etc.
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.create_release.outputs.id }}
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Read VERSION file
+        id: version
+        run: echo "version=$(cat VERSION)" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Bob v${{ steps.version.outputs.version }}
+          draft: true  # Create as draft so you can manually set as latest
+          prerelease: false
+          body: |
+            ## Bob v${{ steps.version.outputs.version }}
+
+            ### 🚀 What's New
+            <!-- Add release notes here -->
+
+            ### 📦 Downloads
+            Choose the version for your platform:
+
+            **Windows:**
+            - `Bob-Setup-${{ steps.version.outputs.version }}.exe` - Installer
+            - `Bob-${{ steps.version.outputs.version }}.exe` - Portable
+
+            **macOS:**
+            - `Bob-${{ steps.version.outputs.version }}.dmg` - Disk Image
+            - `Bob-${{ steps.version.outputs.version }}-mac.zip` - ZIP Archive
+
+            **Linux:**
+            - `Bob-${{ steps.version.outputs.version }}.AppImage` - AppImage
+            - `bob_${{ steps.version.outputs.version }}_amd64.deb` - Debian Package
+            - `bob-${{ steps.version.outputs.version }}.x86_64.rpm` - RPM Package
+
+            ### 🔧 Requirements
+            - Claude Code CLI installed and configured
+            - Git with worktree support
+            - GitHub CLI (optional, for PR features)
+
+  build-linux:
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm run install:dependencies
+
+      - name: Build for Linux
+        run: npm run dist:linux
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Linux AppImage
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./dist-electron/*.AppImage
+          asset_name: Bob-$(cat VERSION).AppImage
+          asset_content_type: application/octet-stream
+
+      - name: Upload Linux deb
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./dist-electron/*.deb
+          asset_name: bob_$(cat VERSION)_amd64.deb
+          asset_content_type: application/vnd.debian.binary-package
+
+      - name: Upload Linux rpm
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./dist-electron/*.rpm
+          asset_name: bob-$(cat VERSION).x86_64.rpm
+          asset_content_type: application/x-rpm
+
+  build-windows:
+    needs: create-release
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm run install:dependencies
+
+      - name: Build for Windows
+        run: npm run dist:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Windows Installer
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./dist-electron/*.exe
+          asset_name: Bob-Setup-$(Get-Content VERSION).exe
+          asset_content_type: application/octet-stream
+
+      - name: Upload Windows Portable
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./dist-electron/*portable*.exe
+          asset_name: Bob-$(Get-Content VERSION).exe
+          asset_content_type: application/octet-stream
+
+  build-macos:
+    needs: create-release
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm run install:dependencies
+
+      - name: Build for macOS
+        run: npm run dist:mac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload macOS DMG
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./dist-electron/*.dmg
+          asset_name: Bob-$(cat VERSION).dmg
+          asset_content_type: application/octet-stream
+
+      - name: Upload macOS ZIP
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./dist-electron/*.zip
+          asset_name: Bob-$(cat VERSION)-mac.zip
+          asset_content_type: application/zip

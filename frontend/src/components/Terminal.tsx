@@ -25,7 +25,23 @@ export const TerminalComponent: React.FC<TerminalComponentProps> = ({ sessionId,
 
     setConnectionState('connecting');
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${wsProtocol}//${window.location.hostname}:3001?sessionId=${sessionId}`;
+    // In Electron production mode, use the same port as the web server
+    // In development mode, use the backend port (43829)
+    const isElectron = window.electronAPI !== undefined;
+    const isDevelopment = window.location.port === '47285';
+
+    let wsPort;
+    if (isElectron && !isDevelopment) {
+      // Production Electron app - use the same port as the current page
+      wsPort = window.location.port || '43829';
+    } else {
+      // Development mode or web browser - use backend port
+      wsPort = '43829';
+    }
+
+    const wsUrl = `${wsProtocol}//${window.location.hostname}:${wsPort}?sessionId=${sessionId}`;
+    console.log(`Attempting WebSocket connection to: ${wsUrl}`);
+    console.log(`Connection details: electron=${isElectron}, development=${isDevelopment}, port=${wsPort}`);
     websocket.current = new WebSocket(wsUrl);
 
     websocket.current.onopen = () => {

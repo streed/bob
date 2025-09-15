@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { GitService } from './services/git.js';
@@ -15,7 +16,7 @@ const app = express();
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 43829;
 
 app.use(cors());
 app.use(express.json());
@@ -117,6 +118,27 @@ app.get('/api/system-status', async (req, res) => {
     res.status(500).json({ error: 'Failed to get system status' });
   }
 });
+
+// Serve static files from frontend build (only in production)
+const isProduction = process.env.NODE_ENV === 'production';
+if (isProduction) {
+  const frontendPath = path.join(__dirname, '../../frontend/dist');
+  app.use(express.static(frontendPath));
+
+  // Serve index.html for all non-API routes (SPA routing)
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(frontendPath, 'index.html'));
+  });
+} else {
+  // In development, just show a message for non-API routes
+  app.get('*', (req, res) => {
+    res.json({
+      message: 'Bob backend running in development mode',
+      frontend: 'http://localhost:47285',
+      api: `http://localhost:${PORT}/api`
+    });
+  });
+}
 
 wss.on('connection', (ws, req) => {
   const url = new URL(req.url!, `http://${req.headers.host}`);

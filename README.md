@@ -59,16 +59,44 @@ Bob helps you juggle multiple projects simultaneously by spinning up isolated Cl
 - [Claude Code CLI](https://claude.ai/code) installed and configured
 - [GitHub CLI](https://cli.github.com/) for pull request automation (optional)
 
-### Installation & Setup
+### Option 1: Desktop App (Recommended)
+
+**Download & Install**
+1. **Download the latest release** from [GitHub Releases](https://github.com/your-org/bob/releases)
+   - **Windows**: `Bob-Setup-{VERSION}.exe` (installer) or `Bob-{VERSION}.exe` (portable)
+   - **macOS**: `Bob-{VERSION}.dmg` (disk image) or `Bob-{VERSION}-mac.zip` (universal Intel/M1)
+   - **Linux**: `Bob-{VERSION}.AppImage`, `bob_{VERSION}_amd64.deb`, or `bob-{VERSION}.x86_64.rpm`
+
+2. **Install and Launch**
+   - Run the installer or extract the portable version
+   - Launch Bob from your applications menu or desktop
+   - The app will automatically start the backend service
+
+3. **Add Your First Repository**
+   - Use File → Open Repository or the "Add Repository" button
+   - Select your git repository directory
+   - Bob will scan and index your project
+
+### Option 2: Development Setup
 
 1. **Clone Bob's Repository**
    ```bash
    git clone <repository-url>
    cd bob
-   npm install
+   npm run install:dependencies
    ```
 
-2. **Start Bob's Services**
+2. **Build and Run Desktop App**
+   ```bash
+   # Run in development mode
+   npm run dev:app
+
+   # Or build and run production app
+   npm run build
+   npm run start:electron
+   ```
+
+3. **Web Development Mode** (for development only)
    ```bash
    # Clean start (recommended for first time or after branch switches)
    npm run dev:clean
@@ -77,18 +105,10 @@ Bob helps you juggle multiple projects simultaneously by spinning up isolated Cl
    npm run dev
    ```
 
-3. **Optional: Authenticate with GitHub** (for PR features)
+4. **Optional: Authenticate with GitHub** (for PR features)
    ```bash
    gh auth login
    ```
-
-4. **Open Bob's Interface**
-   Navigate to `http://localhost:5173` in your browser
-
-5. **Add Your First Repository**
-   - Click "Add Repository"
-   - Enter the path to your git repository
-   - Bob will scan and index your project
 
 ## 🎮 How to Use Bob
 
@@ -183,6 +203,20 @@ Bob is built with a modern, scalable architecture:
 - Repository, worktree, and instance state management
 - Optimized queries with JOIN operations for performance
 
+## 📦 Versioning
+
+Bob uses semantic versioning (semver) with a centralized VERSION file approach:
+
+- **Version Storage**: Current version is stored in the `VERSION` file at project root
+- **Format**: `MAJOR.MINOR.PATCH` (e.g., `0.1.0`)
+- **Sync Command**: `npm run sync-version` updates all package.json files
+- **Release Process**: See [RELEASE.md](RELEASE.md) for complete release workflow
+
+### Version Information
+- **Current Version**: Displayed in app "About" dialog (reads from VERSION file)
+- **Development**: Version synced automatically during build process
+- **Production**: Version must be manually updated in VERSION file for releases
+
 ## 🚀 Development
 
 ### Project Structure
@@ -201,6 +235,12 @@ bob/
 │   │   ├── services/   # Core business logic services
 │   │   ├── database/   # Database layer and migrations
 │   │   └── cli/        # Command-line utilities
+├── electron/           # Electron desktop app
+│   ├── main.js         # Main process (reads VERSION file)
+│   └── preload.js      # Preload script
+├── .github/workflows/  # GitHub Actions for automated builds
+├── VERSION             # Semantic version (single source of truth)
+├── RELEASE.md          # Release process documentation
 ├── package.json        # Root package with workspace config
 └── CLAUDE.md          # Development instructions for Claude
 ```
@@ -209,18 +249,31 @@ bob/
 
 **Development**
 ```bash
-npm run dev              # Start both frontend and backend
+npm run dev              # Start both frontend and backend (web mode)
 npm run dev:clean        # Clean start (kills existing processes)
-npm run dev:frontend     # Start only frontend (port 5173)
-npm run dev:backend      # Start only backend (port 3001)
+npm run dev:app          # Start desktop app in development mode
+npm run dev:electron     # Start Electron only (for debugging)
+npm run dev:frontend     # Start only frontend (port 47285)
+npm run dev:backend      # Start only backend (port 43829)
 ```
 
-**Production**
+**Building**
 ```bash
 npm run build           # Build both frontend and backend
 npm run build:frontend  # Build only frontend
 npm run build:backend   # Build only backend
+npm run start:electron  # Run production desktop app
 ```
+
+**Versioning & Releases**
+```bash
+npm run sync-version    # Sync VERSION file to all package.json files
+npm run dist            # Build and package for current platform
+npm run dist:linux      # Build Linux packages (AppImage, deb, rpm)
+npm run dist:mac        # Build macOS packages (dmg, zip)
+npm run dist:win        # Build Windows packages (nsis installer, portable)
+```
+
 
 **Database Management**
 ```bash
@@ -355,15 +408,15 @@ claude --version
 **Port Conflicts**
 ```bash
 # Kill processes using development ports
-lsof -ti:5173 | xargs kill -9  # Frontend
-lsof -ti:3001 | xargs kill -9  # Backend
+lsof -ti:47285 | xargs kill -9  # Frontend
+lsof -ti:43829 | xargs kill -9  # Backend
 
 # Use clean start
 npm run dev:clean
 ```
 
 **WebSocket Connection Issues**
-- Check firewall settings for ports 3001
+- Check firewall settings for port 43829
 - Verify WebSocket support in browser
 - Monitor network tab for connection errors
 

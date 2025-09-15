@@ -1,6 +1,6 @@
 {
   "name": "bob-frontend",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "Bob Frontend - UI for Claude Code instance management",
   "type": "module",
   "scripts": {
