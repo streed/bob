@@ -98,6 +98,7 @@ export class GitService {
               path: currentWorktree.path,
               branch: currentWorktree.branch,
               repositoryId: repository.id,
+              state: 'working',
               instances: []
             };
             worktrees.push(worktree);
@@ -114,6 +115,7 @@ export class GitService {
           path: currentWorktree.path,
           branch: currentWorktree.branch,
           repositoryId: repository.id,
+          state: 'working',
           instances: []
         };
         worktrees.push(worktree);
@@ -179,6 +181,7 @@ export class GitService {
         path: worktreePath,
         branch: branchName,
         repositoryId,
+        state: 'working',
         instances: []
       };
 
@@ -317,5 +320,108 @@ export class GitService {
 
   getWorktreesByRepository(repositoryId: string): Worktree[] {
     return Array.from(this.worktrees.values()).filter(w => w.repositoryId === repositoryId);
+  }
+
+  async checkPRStatus(worktreeId: string): Promise<{ hasPR: boolean; prUrl?: string; isMerged?: boolean }> {
+    const worktree = this.worktrees.get(worktreeId);
+    if (!worktree) {
+      throw new Error(`Worktree ${worktreeId} not found`);
+    }
+
+    const repository = this.repositories.get(worktree.repositoryId);
+    if (!repository) {
+      throw new Error(`Repository ${worktree.repositoryId} not found`);
+    }
+
+    try {
+      // Get current branch name
+      const { stdout: currentBranch } = await execAsync('git branch --show-current', {
+        cwd: worktree.path
+      });
+      const branchName = currentBranch.trim();
+
+      // Check if PR exists for this branch using GitHub CLI
+      const { stdout: prInfo } = await execAsync(`gh pr list --head ${branchName} --json number,url,state`, {
+        cwd: repository.path
+      });
+
+      const prs = JSON.parse(prInfo);
+      if (prs.length === 0) {
+        return { hasPR: false };
+      }
+
+      const pr = prs[0];
+      return {
+        hasPR: true,
+        prUrl: pr.url,
+        isMerged: pr.state === 'MERGED'
+      };
+    } catch (error) {
+      // GitHub CLI not available or other error - fall back to no PR status
+      console.warn(`Could not check PR status for worktree ${worktreeId}:`, error);
+      return { hasPR: false };
+    }
+  }
+
+  async updateWorktreeState(worktreeId: string, newState: 'working' | 'review' | 'done', prUrl?: string): Promise<void> {
+    const worktree = this.worktrees.get(worktreeId);
+    if (!worktree) {
+      throw new Error(`Worktree ${worktreeId} not found`);
+    }
+
+    // Update in-memory state
+    worktree.state = newState;
+    if (prUrl) {
+      worktree.prUrl = prUrl;
+    }
+
+    // Update in database
+    await this.db.updateWorktreeState(worktreeId, newState, prUrl);
+  }
+
+  async performPeriodicStateCheck(): Promise<{ updated: number; errors: string[] }> {
+    let updated = 0;
+    const errors: string[] = [];
+
+    // Check all worktrees that are not in 'done' state
+    const activeWorktrees = Array.from(this.worktrees.values()).filter(w => w.state !== 'done');
+
+    for (const worktree of activeWorktrees) {
+      try {
+        // Update merge check timestamp
+        await this.db.updateWorktreeMergeCheck(worktree.id);
+        
+        // Check if branch is merged
+        const { isMerged } = await this.checkBranchMergeStatus(worktree.id);
+        
+        if (isMerged && worktree.state !== 'done') {
+          await this.updateWorktreeState(worktree.id, 'done');
+          updated++;
+          console.log(`Worktree ${worktree.id} (${worktree.branch}) marked as done - branch merged`);
+          continue;
+        }
+
+        // Check PR status if branch not merged
+        if (!isMerged) {
+          const { hasPR, prUrl, isMerged: prMerged } = await this.checkPRStatus(worktree.id);
+          
+          if (prMerged && worktree.state !== 'done') {
+            await this.updateWorktreeState(worktree.id, 'done', prUrl);
+            updated++;
+            console.log(`Worktree ${worktree.id} (${worktree.branch}) marked as done - PR merged`);
+          } else if (hasPR && worktree.state === 'working') {
+            await this.updateWorktreeState(worktree.id, 'review', prUrl);
+            updated++;
+            console.log(`Worktree ${worktree.id} (${worktree.branch}) marked as in review - PR opened`);
+          }
+        }
+      } catch (error) {
+        const errorMsg = `Error checking state for worktree ${worktree.id}: ${error}`;
+        errors.push(errorMsg);
+        console.error(errorMsg);
+      }
+    }
+
+    return { updated, errors };
   }
 }

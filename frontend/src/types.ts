@@ -12,6 +12,9 @@ export interface Worktree {
   branch: string;
   repositoryId: string;
   instances: ClaudeInstance[];
+  state: 'working' | 'review' | 'done';
+  prUrl?: string;
+  lastMergeCheck?: string;
 }
 
 export interface ClaudeInstance {

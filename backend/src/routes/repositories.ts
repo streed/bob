@@ -74,6 +74,41 @@ export function createRepositoryRoutes(gitService: GitService, claudeService: Cl
     }
   });
 
+  router.get('/worktrees/:worktreeId/pr-status', async (req, res) => {
+    try {
+      const prStatus = await gitService.checkPRStatus(req.params.worktreeId);
+      res.json(prStatus);
+    } catch (error) {
+      res.status(500).json({ error: `Failed to check PR status: ${error}` });
+    }
+  });
+
+  router.put('/worktrees/:worktreeId/state', async (req, res) => {
+    try {
+      const { state, prUrl } = req.body;
+      
+      if (!state || !['working', 'review', 'done'].includes(state)) {
+        return res.status(400).json({ error: 'Valid state is required (working, review, done)' });
+      }
+
+      await gitService.updateWorktreeState(req.params.worktreeId, state, prUrl);
+      
+      const updatedWorktree = gitService.getWorktree(req.params.worktreeId);
+      res.json(updatedWorktree);
+    } catch (error) {
+      res.status(500).json({ error: `Failed to update worktree state: ${error}` });
+    }
+  });
+
+  router.post('/check-states', async (req, res) => {
+    try {
+      const result = await gitService.performPeriodicStateCheck();
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: `Failed to check worktree states: ${error}` });
+    }
+  });
+
   router.delete('/worktrees/:worktreeId', async (req, res) => {
     try {
       const force = req.query.force === 'true';

@@ -6,6 +6,7 @@ import { WebSocketServer } from 'ws';
 import { GitService } from './services/git.js';
 import { ClaudeService } from './services/claude.js';
 import { TerminalService } from './services/terminal.js';
+import { WorktreeStateService } from './services/worktree-state.js';
 import { DatabaseService } from './database/database.js';
 import { createRepositoryRoutes } from './routes/repositories.js';
 import { createInstanceRoutes } from './routes/instances.js';
@@ -29,8 +30,12 @@ console.log('Database initialized');
 const gitService = new GitService(db);
 const claudeService = new ClaudeService(gitService, db);
 const terminalService = new TerminalService();
+const worktreeStateService = new WorktreeStateService(gitService, claudeService);
 
 console.log('Services initialized');
+
+// Start the worktree state monitoring service
+worktreeStateService.start();
 
 app.use('/api/repositories', createRepositoryRoutes(gitService, claudeService));
 app.use('/api/instances', createInstanceRoutes(claudeService, terminalService, gitService));
@@ -156,6 +161,7 @@ wss.on('connection', (ws, req) => {
 const gracefulShutdown = async () => {
   console.log('Shutting down gracefully...');
   
+  worktreeStateService.stop();
   await claudeService.cleanup();
   terminalService.cleanup();
   db.close();

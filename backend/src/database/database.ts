@@ -86,8 +86,16 @@ export class DatabaseService {
   // Worktree methods
   async saveWorktree(worktree: Worktree): Promise<void> {
     await this.run(
-      `INSERT OR REPLACE INTO worktrees (id, repository_id, path, branch) VALUES (?, ?, ?, ?)`,
-      [worktree.id, worktree.repositoryId, worktree.path, worktree.branch]
+      `INSERT OR REPLACE INTO worktrees (id, repository_id, path, branch, state, pr_url, last_merge_check) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        worktree.id, 
+        worktree.repositoryId, 
+        worktree.path, 
+        worktree.branch, 
+        worktree.state || 'working',
+        worktree.prUrl || null,
+        worktree.lastMergeCheck ? worktree.lastMergeCheck.toISOString() : null
+      ]
     );
   }
 
@@ -103,6 +111,9 @@ export class DatabaseService {
       repositoryId: row.repository_id,
       path: row.path,
       branch: row.branch,
+      state: row.state || 'working',
+      prUrl: row.pr_url || undefined,
+      lastMergeCheck: row.last_merge_check ? new Date(row.last_merge_check) : undefined,
       instances
     };
   }
@@ -115,6 +126,9 @@ export class DatabaseService {
       repositoryId: row.repository_id,
       path: row.path,
       branch: row.branch,
+      state: row.state || 'working',
+      prUrl: row.pr_url || undefined,
+      lastMergeCheck: row.last_merge_check ? new Date(row.last_merge_check) : undefined,
       instances: await this.getInstancesByWorktree(row.id)
     })));
 
@@ -123,6 +137,44 @@ export class DatabaseService {
 
   async deleteWorktree(id: string): Promise<void> {
     await this.run('DELETE FROM worktrees WHERE id = ?', [id]);
+  }
+
+  async updateWorktreeState(id: string, state: 'working' | 'review' | 'done', prUrl?: string): Promise<void> {
+    if (prUrl) {
+      await this.run(
+        'UPDATE worktrees SET state = ?, pr_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [state, prUrl, id]
+      );
+    } else {
+      await this.run(
+        'UPDATE worktrees SET state = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [state, id]
+      );
+    }
+  }
+
+  async updateWorktreeMergeCheck(id: string): Promise<void> {
+    await this.run(
+      'UPDATE worktrees SET last_merge_check = CURRENT_TIMESTAMP WHERE id = ?',
+      [id]
+    );
+  }
+
+  async getWorktreesByState(state: 'working' | 'review' | 'done'): Promise<Worktree[]> {
+    const rows = await this.all('SELECT * FROM worktrees WHERE state = ? ORDER BY created_at DESC', [state]);
+    
+    const worktrees = await Promise.all(rows.map(async (row) => ({
+      id: row.id,
+      repositoryId: row.repository_id,
+      path: row.path,
+      branch: row.branch,
+      state: row.state || 'working',
+      prUrl: row.pr_url || undefined,
+      lastMergeCheck: row.last_merge_check ? new Date(row.last_merge_check) : undefined,
+      instances: await this.getInstancesByWorktree(row.id)
+    })));
+
+    return worktrees;
   }
 
   // Claude instance methods

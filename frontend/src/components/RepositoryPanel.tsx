@@ -48,22 +48,53 @@ export const RepositoryPanel: React.FC<RepositoryPanelProps> = ({
 
   const getWorktreeStatus = (worktree: Worktree) => {
     const worktreeInstances = instances.filter(i => i.worktreeId === worktree.id);
-    if (worktreeInstances.length === 0) return { status: 'none', label: 'No Instance' };
+    const hasInstance = worktreeInstances.length > 0;
     
-    // Since we enforce single instance per worktree, just get the first (and only) instance
-    const instance = worktreeInstances[0];
+    // Show worktree state as primary status
+    let stateInfo = {
+      status: 'working',
+      label: 'Working',
+      color: '#17a2b8' // blue for working
+    };
     
-    switch (instance.status) {
-      case 'running':
-        return { status: 'running', label: 'Running' };
-      case 'starting':
-        return { status: 'starting', label: 'Starting' };
-      case 'error':
-        return { status: 'error', label: 'Error' };
-      case 'stopped':
+    switch (worktree.state) {
+      case 'review':
+        stateInfo = { status: 'review', label: 'In Review', color: '#ffc107' }; // yellow for review
+        break;
+      case 'done':
+        stateInfo = { status: 'done', label: 'Done', color: '#28a745' }; // green for done
+        break;
       default:
-        return { status: 'stopped', label: 'Stopped' };
+        stateInfo = { status: 'working', label: 'Working', color: '#17a2b8' }; // blue for working
     }
+    
+    // Add instance status as secondary info if there's an instance
+    if (hasInstance) {
+      const instance = worktreeInstances[0];
+      let instanceStatus = '';
+      
+      switch (instance.status) {
+        case 'running':
+          instanceStatus = ' (Claude Running)';
+          break;
+        case 'starting':
+          instanceStatus = ' (Claude Starting)';
+          break;
+        case 'error':
+          instanceStatus = ' (Claude Error)';
+          break;
+        case 'stopped':
+          instanceStatus = ' (Claude Stopped)';
+          break;
+      }
+      
+      return {
+        ...stateInfo,
+        label: stateInfo.label + instanceStatus
+      };
+    }
+    
+    return stateInfo;
   };
 
   const getBranchDisplayName = (branch: string) => {
@@ -244,17 +275,12 @@ export const RepositoryPanel: React.FC<RepositoryPanelProps> = ({
                                 <div
                                   className={`instance-status ${isStarting ? 'starting' : status.status}`}
                                   style={{
-                                    backgroundColor:
-                                      isStarting ? '#ffc107' :
-                                      status.status === 'running' ? '#28a745' :
-                                      status.status === 'starting' ? '#ffc107' :
-                                      status.status === 'error' ? '#dc3545' :
-                                      status.status === 'stopped' ? '#6c757d' :
-                                      status.status === 'none' ? '#888' : '#444',
-                                    color:
-                                      isStarting || status.status === 'starting' ? '#000' :
-                                      status.status === 'none' ? '#fff' :
-                                      '#fff'
+                                    backgroundColor: isStarting ? '#ffc107' : status.color,
+                                    color: '#fff',
+                                    fontSize: '11px',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    fontWeight: 'bold'
                                   }}
                                 >
                                   {isStarting ? 'Starting...' : status.label}
@@ -361,15 +387,8 @@ export const RepositoryPanel: React.FC<RepositoryPanelProps> = ({
                         fontSize: '8px',
                         padding: '1px 4px',
                         borderRadius: '2px',
-                        backgroundColor:
-                          isStarting ? '#ffc107' :
-                          status.status === 'running' ? '#28a745' :
-                          status.status === 'starting' ? '#ffc107' :
-                          status.status === 'error' ? '#dc3545' :
-                          status.status === 'stopped' ? '#6c757d' :
-                          status.status === 'none' ? '#888' : '#444',
-                        color:
-                          isStarting || status.status === 'starting' ? '#000' : '#fff'
+                        backgroundColor: isStarting ? '#ffc107' : status.color,
+                        color: '#fff'
                       }}
                     >
                       {isStarting ? 'Starting...' : status.label}
