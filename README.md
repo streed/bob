@@ -57,6 +57,7 @@ Bob helps you juggle multiple projects simultaneously by spinning up isolated Cl
 - Node.js (v18+)
 - Git with worktree support
 - [Claude Code CLI](https://claude.ai/code) installed and configured
+- [GitHub CLI](https://cli.github.com/) for pull request automation (optional)
 
 ### Installation & Setup
 
@@ -76,10 +77,15 @@ Bob helps you juggle multiple projects simultaneously by spinning up isolated Cl
    npm run dev
    ```
 
-3. **Open Bob's Interface**
+3. **Optional: Authenticate with GitHub** (for PR features)
+   ```bash
+   gh auth login
+   ```
+
+4. **Open Bob's Interface**
    Navigate to `http://localhost:5173` in your browser
 
-4. **Add Your First Repository**
+5. **Add Your First Repository**
    - Click "Add Repository"
    - Enter the path to your git repository
    - Bob will scan and index your project
