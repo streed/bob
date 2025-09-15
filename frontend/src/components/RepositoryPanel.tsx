@@ -177,16 +177,18 @@ export const RepositoryPanel: React.FC<RepositoryPanelProps> = ({
                   </div>
                 )}
 
-                {/* Only show actual git worktrees (not regular git branches) for safety */}
+                {/* Only show actual git worktrees (not the main repository) */}
                 {repo.worktrees.filter(worktree => {
-                  const branchName = worktree.branch.toLowerCase();
-                  return !branchName.endsWith('/main') && !branchName.endsWith('/master');
+                  // Exclude worktrees that are actually the main repository
+                  // (worktree path matches repository path)
+                  return worktree.path !== repo.path;
                 }).length > 0 && (
                   <div className="worktrees-list">
                     {repo.worktrees
                       .filter(worktree => {
-                        const branchName = worktree.branch.toLowerCase();
-                        return !branchName.endsWith('/main') && !branchName.endsWith('/master');
+                        // Exclude worktrees that are actually the main repository
+                        // (worktree path matches repository path)
+                        return worktree.path !== repo.path;
                       })
                       .map(worktree => {
                       const status = getWorktreeStatus(worktree);
