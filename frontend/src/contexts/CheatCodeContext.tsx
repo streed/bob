@@ -38,10 +38,6 @@ export const CheatCodeProvider: React.FC<CheatCodeProviderProps> = ({ children }
       const isInTerminalArea = target.closest('.right-panel') || 
                               target.closest('.terminal-content') ||
                               target.closest('.empty-terminal');
-      
-      const isInGitTab = target.closest('[style*="display: activeTab === \'git\'"]') ||
-                        (target.closest('.terminal-content') && 
-                         target.closest('[style*="git"]'));
 
       if (isInputField || isInTerminalArea) {
         return;

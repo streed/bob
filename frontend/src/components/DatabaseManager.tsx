@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 
 interface TableData {
@@ -19,6 +20,7 @@ interface Column {
 }
 
 export function DatabaseManager() {
+  const navigate = useNavigate();
   const [isWarningAccepted, setIsWarningAccepted] = useState(false);
   const [tables, setTables] = useState<string[]>([]);
   const [selectedTable, setSelectedTable] = useState<string>('');
@@ -273,7 +275,7 @@ export function DatabaseManager() {
                     </td>
                   )}
                   {columns.map(col => (
-                    <td key={col} title={String(row[col])}>
+                    <td key={col} title={String(row[col])} className={col.toLowerCase() === 'id' ? 'id-column' : ''}>
                       {String(row[col])}
                     </td>
                   ))}
@@ -325,7 +327,7 @@ export function DatabaseManager() {
               {queryResult.map((row, index) => (
                 <tr key={index}>
                   {columns.map(col => (
-                    <td key={col} title={String(row[col])}>
+                    <td key={col} title={String(row[col])} className={col.toLowerCase() === 'id' ? 'id-column' : ''}>
                       {String(row[col])}
                     </td>
                   ))}
@@ -371,7 +373,7 @@ export function DatabaseManager() {
       <div className="database-header">
         <h2>Database Management</h2>
         <button 
-          onClick={() => setIsWarningAccepted(false)}
+          onClick={() => navigate('/')}
           className="button-secondary"
         >
           Exit Database Manager

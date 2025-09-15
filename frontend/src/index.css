@@ -743,10 +743,19 @@ body {
   padding: 8px 12px;
   border-bottom: 1px solid #444;
   color: #e5e5e5;
-  max-width: 200px;
+  max-width: 300px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  word-break: break-all;
+}
+
+/* Special styling for ID columns to ensure they're always visible */
+.data-table td.id-column {
+  max-width: none;
+  min-width: 80px;
+  font-family: monospace;
+  background: #2a2a3a;
 }
 
 .data-table tr:hover {
