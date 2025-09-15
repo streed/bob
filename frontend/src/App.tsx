@@ -53,6 +53,14 @@ function MainApp() {
     return () => clearInterval(interval);
   }, []);
 
+  // Refresh data when returning to main app (e.g., from database page)
+  useEffect(() => {
+    if (location.pathname === '/' && location.state?.fromDatabase) {
+      // Immediately refresh data when returning from database page
+      loadData();
+    }
+  }, [location]);
+
   // Handle URL parameters for direct worktree linking
   useEffect(() => {
     const worktreeParam = searchParams.get('worktree');

@@ -373,7 +373,7 @@ export function DatabaseManager() {
       <div className="database-header">
         <h2>Database Management</h2>
         <button 
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/', { state: { fromDatabase: true } })}
           className="button-secondary"
         >
           Exit Database Manager
