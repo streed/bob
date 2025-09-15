@@ -25,10 +25,6 @@ Bob helps you juggle multiple projects simultaneously by spinning up isolated Cl
 ![Bob Main Interface](docs/screenshots/main-interface.png)
 *Repository management on the left, terminal interface on the right*
 
-### Terminal Sessions
-![Terminal Sessions](docs/screenshots/terminal-sessions.png)
-*Claude and directory terminals side by side*
-
 ### Instance Management
 ![Instance Management](docs/screenshots/instance-management.png)
 *Real-time status monitoring and control*

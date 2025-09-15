@@ -38,20 +38,83 @@ app.use('/api/filesystem', createFilesystemRoutes());
 // Make services available to git routes
 app.locals.gitService = gitService;
 app.locals.claudeService = claudeService;
+app.locals.databaseService = db;
 app.use('/api/git', gitRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.get('/api/token-usage', (req, res) => {
+app.get('/api/system-status', async (req, res) => {
   try {
-    // Get token usage stats from Claude service
-    const tokenStats = claudeService.getTokenUsageStats();
-    res.json(tokenStats);
+    const { exec } = await import('child_process');
+    const { promisify } = await import('util');
+    const execAsync = promisify(exec);
+
+    // Check Claude CLI availability
+    let claudeStatus = 'unknown';
+    let claudeVersion = '';
+    try {
+      const { stdout } = await execAsync('claude --version');
+      claudeVersion = stdout.trim();
+      claudeStatus = 'available';
+    } catch (error) {
+      claudeStatus = 'not_available';
+    }
+
+    // Check GitHub CLI availability
+    let githubStatus = 'unknown';
+    let githubVersion = '';
+    let githubUser = '';
+    try {
+      const { stdout: versionOut } = await execAsync('gh --version');
+      githubVersion = versionOut.split('\n')[0]?.trim() || '';
+      githubStatus = 'available';
+
+      try {
+        const { stdout: userOut } = await execAsync('gh api user --jq .login');
+        githubUser = userOut.trim();
+      } catch (userError) {
+        githubStatus = 'not_authenticated';
+      }
+    } catch (error) {
+      githubStatus = 'not_available';
+    }
+
+    // Get system metrics
+    const gitService = req.app.locals.gitService;
+    const claudeService = req.app.locals.claudeService;
+
+    const repositories = gitService.getRepositories();
+    const totalWorktrees = repositories.reduce((count, repo) => count + repo.worktrees.length, 0);
+    const instances = claudeService.getInstances();
+    const activeInstances = instances.filter(i => i.status === 'running' || i.status === 'starting').length;
+
+    res.json({
+      claude: {
+        status: claudeStatus,
+        version: claudeVersion
+      },
+      github: {
+        status: githubStatus,
+        version: githubVersion,
+        user: githubUser
+      },
+      metrics: {
+        repositories: repositories.length,
+        worktrees: totalWorktrees,
+        totalInstances: instances.length,
+        activeInstances: activeInstances
+      },
+      server: {
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+        nodeVersion: process.version
+      }
+    });
   } catch (error) {
-    console.error('Error getting token usage stats:', error);
-    res.status(500).json({ error: 'Failed to get token usage statistics' });
+    console.error('Error getting system status:', error);
+    res.status(500).json({ error: 'Failed to get system status' });
   }
 });
 

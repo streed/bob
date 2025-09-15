@@ -1,14 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Repository, ClaudeInstance, Worktree } from './types';
 import { api } from './api';
 import { RepositoryPanel } from './components/RepositoryPanel';
 import { TerminalPanel } from './components/TerminalPanel';
 
 function App() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [instances, setInstances] = useState<ClaudeInstance[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [, setError] = useState<string | null>(null);
   const [instanceError, setInstanceError] = useState<string | null>(null);
   const [selectedWorktreeId, setSelectedWorktreeId] = useState<string | null>(null);
 
@@ -17,6 +21,33 @@ function App() {
     const interval = setInterval(loadData, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  // Handle URL parameters for direct worktree linking
+  useEffect(() => {
+    const worktreeParam = searchParams.get('worktree');
+
+    if (!worktreeParam) {
+      // No worktree in URL, ensure nothing is selected
+      if (selectedWorktreeId) {
+        setSelectedWorktreeId(null);
+      }
+      return;
+    }
+
+    if (repositories.length > 0) {
+      // Find worktree by ID
+      const allWorktrees = repositories.flatMap(repo => repo.worktrees);
+      const targetWorktree = allWorktrees.find(w => w.id === worktreeParam);
+
+      if (targetWorktree && selectedWorktreeId !== worktreeParam) {
+        // Only select if it's different from current selection
+        handleSelectWorktree(targetWorktree.id);
+      } else if (!targetWorktree && selectedWorktreeId) {
+        // Worktree not found, clear selection
+        setSelectedWorktreeId(null);
+      }
+    }
+  }, [repositories, searchParams]);
 
   const loadData = async () => {
     try {
@@ -149,12 +180,15 @@ function App() {
 
   const handleSelectWorktree = async (worktreeId: string) => {
     setSelectedWorktreeId(worktreeId);
-    
+
+    // Update URL to reflect selected worktree
+    setSearchParams({ worktree: worktreeId });
+
     // Get fresh instance data directly from API to avoid stale state
     try {
       const freshInstances = await api.getInstances();
       const existingInstance = freshInstances.find(instance => instance.worktreeId === worktreeId);
-    
+
       if (existingInstance) {
         // If instance exists but is stopped/error, restart it
         if (existingInstance.status === 'stopped' || existingInstance.status === 'error') {
@@ -180,7 +214,7 @@ function App() {
     } catch (error) {
       console.error('Failed to get fresh instance data:', error);
     }
-    
+
     // Only refresh if no instance operations were performed
     await loadData();
   };
@@ -207,14 +241,17 @@ function App() {
     <div className="container">
       <div className="header">
         <h1
-          onClick={() => setSelectedWorktreeId(null)}
+          onClick={() => {
+            setSelectedWorktreeId(null);
+            setSearchParams({});
+          }}
           style={{
             cursor: 'pointer',
             transition: 'color 0.2s ease',
             margin: 0
           }}
-          onMouseEnter={(e) => e.target.style.color = '#58a6ff'}
-          onMouseLeave={(e) => e.target.style.color = ''}
+          onMouseEnter={(e) => (e.target as HTMLElement).style.color = '#58a6ff'}
+          onMouseLeave={(e) => (e.target as HTMLElement).style.color = ''}
         >
           Bob
         </h1>
@@ -240,6 +277,7 @@ function App() {
           onCloseTerminalSession={handleCloseTerminalSession}
           onRestartInstance={handleRestartInstance}
           onStopInstance={handleStopInstance}
+          onDeleteWorktree={handleDeleteWorktree}
           error={instanceError}
         />
       </div>

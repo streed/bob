@@ -259,9 +259,31 @@ export class GitService {
     }
 
     try {
+      // If force deletion, first revert any uncommitted changes in the worktree
+      if (force) {
+        try {
+          console.log(`Force deletion: reverting uncommitted changes in ${worktree.path}`);
+
+          // Check if there are any changes to revert
+          const { stdout: status } = await execAsync('git status --porcelain', { cwd: worktree.path });
+
+          if (status.trim()) {
+            // Revert all changes: unstaged, staged, and untracked files
+            await execAsync('git reset --hard HEAD', { cwd: worktree.path });
+            await execAsync('git clean -fd', { cwd: worktree.path });
+            console.log(`Successfully reverted all changes in ${worktree.path}`);
+          } else {
+            console.log(`No changes to revert in ${worktree.path}`);
+          }
+        } catch (revertError) {
+          console.warn(`Warning: Could not revert changes in ${worktree.path}: ${revertError}`);
+          // Continue with deletion even if revert fails
+        }
+      }
+
       // First try to remove the worktree
       await execAsync(`git worktree remove "${worktree.path}"`, { cwd: repository.path });
-      
+
       // If force deletion and branch exists, delete the branch too
       if (force) {
         try {

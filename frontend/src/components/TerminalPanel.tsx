@@ -11,11 +11,255 @@ interface TerminalPanelProps {
   onCloseTerminalSession: (sessionId: string) => void;
   onRestartInstance: (instanceId: string) => Promise<void>;
   onStopInstance: (instanceId: string) => Promise<void>;
+  onDeleteWorktree: (worktreeId: string, force: boolean) => Promise<void>;
   error: string | null;
 }
 
-// Unified diff view component
-const UnifiedDiffView: React.FC<{ gitDiff: string }> = ({ gitDiff }) => {
+// Comment types
+interface DiffComment {
+  id: string;
+  file: string;
+  line: number;
+  type: 'suggestion' | 'warning' | 'error' | 'user';
+  message: string;
+  severity: 'low' | 'medium' | 'high';
+  isAI?: boolean;
+  userReply?: string;
+}
+
+// Inline comment component
+const InlineComment: React.FC<{
+  comment: DiffComment;
+  onReply?: (commentId: string, reply: string) => void;
+  onDismiss?: (commentId: string) => void;
+}> = ({ comment, onReply, onDismiss }) => {
+  const [showReply, setShowReply] = useState(false);
+  const [replyText, setReplyText] = useState(comment.userReply || '');
+
+  const getIconAndColor = () => {
+    switch (comment.type) {
+      case 'error':
+        return { icon: '❌', color: '#f85149', bgColor: '#67060c1a' };
+      case 'warning':
+        return { icon: '⚠️', color: '#f59e0b', bgColor: '#92400e1a' };
+      case 'suggestion':
+        return { icon: '💡', color: '#58a6ff', bgColor: '#0969da1a' };
+      case 'user':
+        return { icon: '💬', color: '#d2a8ff', bgColor: '#6f42c11a' };
+      default:
+        return { icon: '📝', color: '#8b949e', bgColor: '#21262d' };
+    }
+  };
+
+  const { icon, color, bgColor } = getIconAndColor();
+
+  return (
+    <div style={{
+      backgroundColor: bgColor,
+      border: `1px solid ${color}33`,
+      borderRadius: '6px',
+      margin: '4px 0',
+      padding: '8px',
+      fontSize: '12px'
+    }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+        <span style={{ fontSize: '14px' }}>{icon}</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+            <span style={{ color, fontWeight: 'bold', textTransform: 'capitalize' }}>
+              {comment.type} {comment.isAI && '(AI)'}
+            </span>
+            <span style={{ color: '#8b949e', fontSize: '10px' }}>
+              Line {comment.line}
+            </span>
+            {comment.severity && (
+              <span style={{
+                backgroundColor: comment.severity === 'high' ? '#f85149' :
+                                comment.severity === 'medium' ? '#f59e0b' : '#3fb950',
+                color: '#fff',
+                padding: '2px 6px',
+                borderRadius: '10px',
+                fontSize: '10px',
+                fontWeight: 'bold'
+              }}>
+                {comment.severity}
+              </span>
+            )}
+          </div>
+          <div style={{ color: '#e6edf3', lineHeight: '1.4', marginBottom: '8px' }}>
+            {comment.message}
+          </div>
+
+          {comment.userReply && (
+            <div style={{
+              backgroundColor: '#21262d',
+              border: '1px solid #30363d',
+              borderRadius: '4px',
+              padding: '6px',
+              marginBottom: '8px'
+            }}>
+              <div style={{ color: '#8b949e', fontSize: '10px', marginBottom: '2px' }}>Your reply:</div>
+              <div style={{ color: '#e6edf3', fontSize: '11px' }}>{comment.userReply}</div>
+            </div>
+          )}
+
+          {showReply && (
+            <div style={{ marginTop: '8px' }}>
+              <textarea
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                placeholder="Add your reply or additional context..."
+                style={{
+                  width: '100%',
+                  minHeight: '60px',
+                  backgroundColor: '#21262d',
+                  border: '1px solid #30363d',
+                  borderRadius: '4px',
+                  color: '#e6edf3',
+                  padding: '6px',
+                  fontSize: '11px',
+                  resize: 'vertical'
+                }}
+              />
+              <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                <button
+                  onClick={() => {
+                    if (onReply && replyText.trim()) {
+                      onReply(comment.id, replyText.trim());
+                      setShowReply(false);
+                    }
+                  }}
+                  style={{
+                    backgroundColor: '#238636',
+                    border: 'none',
+                    color: '#fff',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    fontSize: '10px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Save Reply
+                </button>
+                <button
+                  onClick={() => setShowReply(false)}
+                  style={{
+                    backgroundColor: 'transparent',
+                    border: '1px solid #30363d',
+                    color: '#8b949e',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    fontSize: '10px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+            {!showReply && (
+              <button
+                onClick={() => setShowReply(true)}
+                style={{
+                  backgroundColor: 'transparent',
+                  border: '1px solid #30363d',
+                  color: '#8b949e',
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  fontSize: '10px',
+                  cursor: 'pointer'
+                }}
+              >
+                Reply
+              </button>
+            )}
+            {onDismiss && (
+              <button
+                onClick={() => onDismiss(comment.id)}
+                style={{
+                  backgroundColor: 'transparent',
+                  border: '1px solid #30363d',
+                  color: '#8b949e',
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  fontSize: '10px',
+                  cursor: 'pointer'
+                }}
+              >
+                Dismiss
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Enhanced unified diff view component with comments
+const UnifiedDiffView: React.FC<{
+  gitDiff: string;
+  comments?: DiffComment[];
+  onAddComment?: (file: string, line: number, message: string) => void;
+  onReplyToComment?: (commentId: string, reply: string) => void;
+  onDismissComment?: (commentId: string) => void;
+}> = ({ gitDiff, comments = [], onAddComment, onReplyToComment, onDismissComment }) => {
+  const [hoveredLine, setHoveredLine] = useState<number | null>(null);
+  const [showAddComment, setShowAddComment] = useState<{ file: string; line: number } | null>(null);
+  const [newCommentText, setNewCommentText] = useState('');
+
+  const parseLineNumber = (line: string): number | null => {
+    if (line.startsWith('@@')) {
+      const match = line.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+      return match ? parseInt(match[1]) : null;
+    }
+    return null;
+  };
+
+  const getActualLineNumber = (lineIndex: number, lines: string[]): number | null => {
+    let currentLineNumber = 1;
+
+    for (let i = 0; i <= lineIndex; i++) {
+      const line = lines[i];
+      if (line.startsWith('@@')) {
+        const newLineNumber = parseLineNumber(line);
+        if (newLineNumber) currentLineNumber = newLineNumber;
+      } else if (line.startsWith('+') && !line.startsWith('+++')) {
+        if (i === lineIndex) return currentLineNumber;
+        currentLineNumber++;
+      } else if (!line.startsWith('-') && !line.startsWith('+++') && !line.startsWith('---') &&
+                 !line.startsWith('new file') && !line.startsWith('index') && !line.startsWith('diff --git')) {
+        if (i === lineIndex) return currentLineNumber;
+        currentLineNumber++;
+      }
+    }
+    return null;
+  };
+
+  const lines = gitDiff.split('\n');
+
+  // Pre-process lines to avoid state updates during render
+  const processedLines = React.useMemo(() => {
+    let currentFile = '';
+    return lines.map((line, index) => {
+      if (line.startsWith('diff --git')) {
+        const match = line.match(/diff --git a\/(.+) b\/(.+)/);
+        if (match) {
+          currentFile = match[2];
+        }
+      }
+      return {
+        line,
+        index,
+        currentFile,
+        actualLineNumber: getActualLineNumber(index, lines)
+      };
+    });
+  }, [gitDiff]);
+
   return (
     <div style={{
       background: '#0d1117',
@@ -25,14 +269,19 @@ const UnifiedDiffView: React.FC<{ gitDiff: string }> = ({ gitDiff }) => {
       fontSize: '12px',
       fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace'
     }}>
-      {gitDiff.split('\n').map((line, index) => {
+      {processedLines.map(({ line, index, currentFile, actualLineNumber }) => {
         let lineStyle: React.CSSProperties = {
           padding: '0 8px',
           margin: 0,
           minHeight: '20px',
           lineHeight: '20px',
-          whiteSpace: 'pre'
+          whiteSpace: 'pre',
+          position: 'relative'
         };
+
+        const lineComments = comments.filter(c =>
+          c.file === currentFile && c.line === actualLineNumber
+        );
 
         if (line.startsWith('diff --git')) {
           lineStyle = {
@@ -79,8 +328,122 @@ const UnifiedDiffView: React.FC<{ gitDiff: string }> = ({ gitDiff }) => {
         }
 
         return (
-          <div key={index} style={lineStyle}>
-            {line || ' '}
+          <div key={index}>
+            <div
+              style={{
+                ...lineStyle,
+                display: 'flex',
+                alignItems: 'center'
+              }}
+              onMouseEnter={() => setHoveredLine(index)}
+              onMouseLeave={() => setHoveredLine(null)}
+            >
+              <span style={{ flex: 1 }}>{line || ' '}</span>
+
+              {/* Add comment button for relevant lines */}
+              {actualLineNumber && currentFile && onAddComment &&
+               (line.startsWith('+') || (!line.startsWith('-') && !line.startsWith('@@'))) &&
+               hoveredLine === index && (
+                <button
+                  onClick={() => setShowAddComment({ file: currentFile, line: actualLineNumber })}
+                  style={{
+                    backgroundColor: '#238636',
+                    border: 'none',
+                    color: '#fff',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    fontSize: '10px',
+                    cursor: 'pointer',
+                    marginLeft: '8px'
+                  }}
+                >
+                  💬
+                </button>
+              )}
+            </div>
+
+            {/* Show add comment form */}
+            {showAddComment && showAddComment.file === currentFile &&
+             showAddComment.line === actualLineNumber && (
+              <div style={{
+                backgroundColor: '#21262d',
+                border: '1px solid #30363d',
+                borderRadius: '6px',
+                margin: '4px 8px',
+                padding: '8px'
+              }}>
+                <textarea
+                  value={newCommentText}
+                  onChange={(e) => setNewCommentText(e.target.value)}
+                  placeholder="Add your comment about this line..."
+                  style={{
+                    width: '100%',
+                    minHeight: '60px',
+                    backgroundColor: '#0d1117',
+                    border: '1px solid #30363d',
+                    borderRadius: '4px',
+                    color: '#e6edf3',
+                    padding: '6px',
+                    fontSize: '11px',
+                    resize: 'vertical'
+                  }}
+                  autoFocus
+                />
+                <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                  <button
+                    onClick={() => {
+                      if (onAddComment && newCommentText.trim()) {
+                        onAddComment(showAddComment.file, showAddComment.line, newCommentText.trim());
+                        setNewCommentText('');
+                        setShowAddComment(null);
+                      }
+                    }}
+                    style={{
+                      backgroundColor: '#238636',
+                      border: 'none',
+                      color: '#fff',
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      fontSize: '10px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Add Comment
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowAddComment(null);
+                      setNewCommentText('');
+                    }}
+                    style={{
+                      backgroundColor: 'transparent',
+                      border: '1px solid #30363d',
+                      color: '#8b949e',
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      fontSize: '10px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Show comments for this line */}
+            {lineComments.length > 0 && (
+              <div style={{ margin: '0 8px' }}>
+                {lineComments.map(comment => (
+                  <InlineComment
+                    key={comment.id}
+                    comment={comment}
+                    onReply={onReplyToComment}
+                    onDismiss={onDismissComment}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         );
       })}
@@ -207,28 +570,28 @@ const parseDiffForSplitView = (gitDiff: string) => {
   return files;
 };
 
-// Token Usage Dashboard Component
-const TokenUsageDashboard: React.FC = () => {
-  const [tokenStats, setTokenStats] = useState<any>(null);
+// System Status Dashboard Component
+const SystemStatusDashboard: React.FC = () => {
+  const [systemStatus, setSystemStatus] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
-    const loadTokenStats = async () => {
+    const loadSystemStatus = async () => {
       try {
         if (!loading) setIsUpdating(true);
-        const stats = await api.getTokenUsageStats();
-        setTokenStats(stats);
+        const status = await api.getSystemStatus();
+        setSystemStatus(status);
       } catch (error) {
-        console.error('Failed to load token stats:', error);
+        console.error('Failed to load system status:', error);
       } finally {
         setLoading(false);
         setIsUpdating(false);
       }
     };
 
-    loadTokenStats();
-    const interval = setInterval(loadTokenStats, 5000); // Update every 5 seconds for real-time feel
+    loadSystemStatus();
+    const interval = setInterval(loadSystemStatus, 10000); // Update every 10 seconds
     return () => clearInterval(interval);
   }, []);
 
@@ -241,12 +604,12 @@ const TokenUsageDashboard: React.FC = () => {
         justifyContent: 'center',
         color: '#888'
       }}>
-        Loading token usage...
+        Loading system status...
       </div>
     );
   }
 
-  if (!tokenStats) {
+  if (!systemStatus) {
     return (
       <div style={{
         flex: 1,
@@ -255,12 +618,38 @@ const TokenUsageDashboard: React.FC = () => {
         justifyContent: 'center',
         color: '#888'
       }}>
-        Failed to load token usage stats
+        Failed to load system status
       </div>
     );
   }
 
-  const maxDailyTokens = Math.max(...tokenStats.dailyUsage.map((day: any) => day.inputTokens + day.outputTokens));
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'available': return '#3fb950';
+      case 'not_authenticated': return '#f59e0b';
+      case 'not_available': return '#f85149';
+      default: return '#8b949e';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'available': return '✅';
+      case 'not_authenticated': return '⚠️';
+      case 'not_available': return '❌';
+      default: return '❓';
+    }
+  };
+
+  const formatUptime = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    return `${hours}h ${minutes}m`;
+  };
+
+  const formatMemory = (bytes: number) => {
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  };
 
   return (
     <div style={{
@@ -271,7 +660,7 @@ const TokenUsageDashboard: React.FC = () => {
       {/* Header */}
       <div style={{ marginBottom: '32px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-          <h2 style={{ color: '#fff', margin: 0, fontSize: '24px' }}>Token Usage Dashboard</h2>
+          <h2 style={{ color: '#fff', margin: 0, fontSize: '24px' }}>System Status</h2>
           {isUpdating && (
             <div style={{
               width: '8px',
@@ -283,30 +672,8 @@ const TokenUsageDashboard: React.FC = () => {
           )}
         </div>
         <p style={{ color: '#888', margin: 0, fontSize: '14px' }}>
-          Monitor your Claude Code sessions and token consumption • Updates every 5 seconds
+          Monitor Bob system health and dependency status • Updates every 10 seconds
         </p>
-
-        {/* Data Source Indicator */}
-        <div style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '6px',
-          marginTop: '8px',
-          padding: '4px 8px',
-          backgroundColor: tokenStats.hasRealData ? '#1a4b2e' : '#4b2a1a',
-          border: `1px solid ${tokenStats.hasRealData ? '#3fb950' : '#f85149'}`,
-          borderRadius: '12px',
-          fontSize: '12px',
-          fontWeight: '500'
-        }}>
-          <div style={{
-            width: '6px',
-            height: '6px',
-            borderRadius: '50%',
-            backgroundColor: tokenStats.hasRealData ? '#3fb950' : '#f85149'
-          }} />
-          {tokenStats.hasRealData ? 'Real-time data' : 'Simulated data'}
-        </div>
       </div>
 
       <style>{`
@@ -326,83 +693,7 @@ const TokenUsageDashboard: React.FC = () => {
         }
       `}</style>
 
-      {/* Summary Cards */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '16px',
-        marginBottom: '32px'
-      }}>
-        <div style={{
-          backgroundColor: '#1a1a1a',
-          border: '1px solid #333',
-          borderRadius: '8px',
-          padding: '20px'
-        }}>
-          <div style={{ color: '#888', fontSize: '12px', marginBottom: '4px' }}>TOTAL INPUT TOKENS</div>
-          <div style={{
-            color: '#58a6ff',
-            fontSize: '28px',
-            fontWeight: 'bold',
-            transition: 'all 0.3s ease-in-out'
-          }}>
-            {tokenStats.totalInputTokens.toLocaleString()}
-          </div>
-        </div>
-
-        <div style={{
-          backgroundColor: '#1a1a1a',
-          border: '1px solid #333',
-          borderRadius: '8px',
-          padding: '20px'
-        }}>
-          <div style={{ color: '#888', fontSize: '12px', marginBottom: '4px' }}>TOTAL OUTPUT TOKENS</div>
-          <div style={{
-            color: '#3fb950',
-            fontSize: '28px',
-            fontWeight: 'bold',
-            transition: 'all 0.3s ease-in-out'
-          }}>
-            {tokenStats.totalOutputTokens.toLocaleString()}
-          </div>
-        </div>
-
-        <div style={{
-          backgroundColor: '#1a1a1a',
-          border: '1px solid #333',
-          borderRadius: '8px',
-          padding: '20px'
-        }}>
-          <div style={{ color: '#888', fontSize: '12px', marginBottom: '4px' }}>TOTAL SESSIONS</div>
-          <div style={{
-            color: '#f0f6fc',
-            fontSize: '28px',
-            fontWeight: 'bold',
-            transition: 'all 0.3s ease-in-out'
-          }}>
-            {tokenStats.totalSessions.toLocaleString()}
-          </div>
-        </div>
-
-        <div style={{
-          backgroundColor: '#1a1a1a',
-          border: '1px solid #333',
-          borderRadius: '8px',
-          padding: '20px'
-        }}>
-          <div style={{ color: '#888', fontSize: '12px', marginBottom: '4px' }}>AVG TOKENS/SESSION</div>
-          <div style={{
-            color: '#d2a8ff',
-            fontSize: '28px',
-            fontWeight: 'bold',
-            transition: 'all 0.3s ease-in-out'
-          }}>
-            {Math.round((tokenStats.totalInputTokens + tokenStats.totalOutputTokens) / tokenStats.totalSessions).toLocaleString()}
-          </div>
-        </div>
-      </div>
-
-      {/* Daily Usage Chart */}
+      {/* System Dependencies */}
       <div style={{
         backgroundColor: '#1a1a1a',
         border: '1px solid #333',
@@ -410,134 +701,185 @@ const TokenUsageDashboard: React.FC = () => {
         padding: '24px',
         marginBottom: '24px'
       }}>
-        <h3 style={{ color: '#fff', margin: 0, marginBottom: '20px', fontSize: '18px' }}>Daily Token Usage (7 Days)</h3>
-        <div style={{
-          display: 'flex',
-          alignItems: 'end',
-          gap: '8px',
-          height: '200px'
-        }}>
-          {tokenStats.dailyUsage.map((day: any, index: number) => {
-            const totalTokens = day.inputTokens + day.outputTokens;
-            const heightPercent = (totalTokens / maxDailyTokens) * 100;
-            const inputPercent = (day.inputTokens / totalTokens) * 100;
+        <h3 style={{ color: '#fff', margin: 0, marginBottom: '20px', fontSize: '18px' }}>System Dependencies</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-            return (
-              <div key={day.date} style={{
-                flex: 1,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                height: '100%'
-              }}>
-                <div style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  height: `${Math.max(5, heightPercent)}%`,
-                  width: '100%',
-                  justifyContent: 'end'
-                }}>
-                  <div style={{
-                    backgroundColor: '#3fb950',
-                    width: '80%',
-                    height: `${100 - inputPercent}%`,
-                    minHeight: '2px',
-                    borderRadius: '2px 2px 0 0',
-                    transition: 'height 0.5s ease-in-out'
-                  }} />
-                  <div style={{
-                    backgroundColor: '#58a6ff',
-                    width: '80%',
-                    height: `${inputPercent}%`,
-                    minHeight: '2px',
-                    borderRadius: '0 0 2px 2px',
-                    transition: 'height 0.5s ease-in-out'
-                  }} />
-                </div>
-                <div style={{
-                  color: '#888',
-                  fontSize: '10px',
-                  marginTop: '8px',
-                  textAlign: 'center'
-                }}>
-                  {new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                </div>
-                <div style={{
-                  color: '#666',
-                  fontSize: '9px',
-                  textAlign: 'center'
-                }}>
-                  {totalTokens.toLocaleString()}
+          {/* Claude CLI Status */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '16px',
+            backgroundColor: '#0d1117',
+            borderRadius: '6px',
+            border: '1px solid #21262d'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{ fontSize: '20px' }}>{getStatusIcon(systemStatus.claude.status)}</span>
+              <div>
+                <div style={{ color: '#fff', fontSize: '14px', fontWeight: 'bold' }}>Claude CLI</div>
+                <div style={{ color: '#888', fontSize: '12px' }}>
+                  {systemStatus.claude.status === 'available' ? 'Ready for AI-powered features' : 'Required for git analysis and PR generation'}
                 </div>
               </div>
-            );
-          })}
-        </div>
-        <div style={{
-          display: 'flex',
-          gap: '20px',
-          marginTop: '16px',
-          fontSize: '12px'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <div style={{ width: '12px', height: '12px', backgroundColor: '#58a6ff', borderRadius: '2px' }} />
-            <span style={{ color: '#888' }}>Input Tokens</span>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{
+                color: getStatusColor(systemStatus.claude.status),
+                fontSize: '12px',
+                fontWeight: 'bold',
+                marginBottom: '2px'
+              }}>
+                {systemStatus.claude.status.replace('_', ' ').toUpperCase()}
+              </div>
+              {systemStatus.claude.version && (
+                <div style={{ color: '#666', fontSize: '10px' }}>
+                  {systemStatus.claude.version}
+                </div>
+              )}
+            </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <div style={{ width: '12px', height: '12px', backgroundColor: '#3fb950', borderRadius: '2px' }} />
-            <span style={{ color: '#888' }}>Output Tokens</span>
+
+          {/* GitHub CLI Status */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '16px',
+            backgroundColor: '#0d1117',
+            borderRadius: '6px',
+            border: '1px solid #21262d'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{ fontSize: '20px' }}>{getStatusIcon(systemStatus.github.status)}</span>
+              <div>
+                <div style={{ color: '#fff', fontSize: '14px', fontWeight: 'bold' }}>GitHub CLI</div>
+                <div style={{ color: '#888', fontSize: '12px' }}>
+                  {systemStatus.github.status === 'available' ? 'Ready for PR operations' :
+                   systemStatus.github.status === 'not_authenticated' ? 'Run: gh auth login' :
+                   'Required for PR creation and updates'}
+                </div>
+              </div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{
+                color: getStatusColor(systemStatus.github.status),
+                fontSize: '12px',
+                fontWeight: 'bold',
+                marginBottom: '2px'
+              }}>
+                {systemStatus.github.status.replace('_', ' ').toUpperCase()}
+              </div>
+              {systemStatus.github.user && (
+                <div style={{ color: '#666', fontSize: '10px' }}>
+                  @{systemStatus.github.user}
+                </div>
+              )}
+              {systemStatus.github.version && (
+                <div style={{ color: '#666', fontSize: '10px' }}>
+                  {systemStatus.github.version.split(' ')[0]}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Active Instances */}
-      {tokenStats.instanceUsage.length > 0 && (
+      {/* Metrics */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gap: '16px',
+        marginBottom: '24px'
+      }}>
         <div style={{
           backgroundColor: '#1a1a1a',
           border: '1px solid #333',
           borderRadius: '8px',
-          padding: '24px'
+          padding: '20px'
         }}>
-          <h3 style={{ color: '#fff', margin: 0, marginBottom: '16px', fontSize: '18px' }}>Instance Usage</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {tokenStats.instanceUsage.slice(0, 5).map((instance: any) => (
-              <div key={instance.instanceId} style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '12px',
-                backgroundColor: '#0d1117',
-                borderRadius: '6px',
-                border: '1px solid #21262d'
-              }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ color: '#fff', fontSize: '13px', marginBottom: '2px' }}>
-                    {instance.instanceId.split('-')[0]}...{instance.instanceId.split('-').pop()}
-                  </div>
-                  <div style={{ color: '#888', fontSize: '11px' }}>
-                    Last active: {new Date(instance.lastActivity).toLocaleString()}
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ color: '#58a6ff', fontSize: '14px', fontWeight: 'bold' }}>
-                      {instance.inputTokens.toLocaleString()}
-                    </div>
-                    <div style={{ color: '#888', fontSize: '10px' }}>input</div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ color: '#3fb950', fontSize: '14px', fontWeight: 'bold' }}>
-                      {instance.outputTokens.toLocaleString()}
-                    </div>
-                    <div style={{ color: '#888', fontSize: '10px' }}>output</div>
-                  </div>
-                </div>
-              </div>
-            ))}
+          <div style={{ color: '#888', fontSize: '12px', marginBottom: '4px' }}>REPOSITORIES</div>
+          <div style={{
+            color: '#58a6ff',
+            fontSize: '28px',
+            fontWeight: 'bold'
+          }}>
+            {systemStatus.metrics.repositories}
           </div>
         </div>
-      )}
+
+        <div style={{
+          backgroundColor: '#1a1a1a',
+          border: '1px solid #333',
+          borderRadius: '8px',
+          padding: '20px'
+        }}>
+          <div style={{ color: '#888', fontSize: '12px', marginBottom: '4px' }}>WORKTREES</div>
+          <div style={{
+            color: '#3fb950',
+            fontSize: '28px',
+            fontWeight: 'bold'
+          }}>
+            {systemStatus.metrics.worktrees}
+          </div>
+        </div>
+
+        <div style={{
+          backgroundColor: '#1a1a1a',
+          border: '1px solid #333',
+          borderRadius: '8px',
+          padding: '20px'
+        }}>
+          <div style={{ color: '#888', fontSize: '12px', marginBottom: '4px' }}>ACTIVE INSTANCES</div>
+          <div style={{
+            color: '#f59e0b',
+            fontSize: '28px',
+            fontWeight: 'bold'
+          }}>
+            {systemStatus.metrics.activeInstances}
+          </div>
+          <div style={{ color: '#666', fontSize: '10px', marginTop: '4px' }}>
+            of {systemStatus.metrics.totalInstances} total
+          </div>
+        </div>
+      </div>
+
+      {/* Server Info */}
+      <div style={{
+        backgroundColor: '#1a1a1a',
+        border: '1px solid #333',
+        borderRadius: '8px',
+        padding: '24px'
+      }}>
+        <h3 style={{ color: '#fff', margin: 0, marginBottom: '16px', fontSize: '18px' }}>Server Information</h3>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '20px'
+        }}>
+          <div>
+            <div style={{ color: '#888', fontSize: '12px', marginBottom: '4px' }}>UPTIME</div>
+            <div style={{ color: '#d2a8ff', fontSize: '20px', fontWeight: 'bold' }}>
+              {formatUptime(systemStatus.server.uptime)}
+            </div>
+          </div>
+          <div>
+            <div style={{ color: '#888', fontSize: '12px', marginBottom: '4px' }}>MEMORY USAGE</div>
+            <div style={{ color: '#f85149', fontSize: '20px', fontWeight: 'bold' }}>
+              {formatMemory(systemStatus.server.memory.heapUsed)}
+            </div>
+            <div style={{ color: '#666', fontSize: '10px' }}>
+              / {formatMemory(systemStatus.server.memory.heapTotal)} heap
+            </div>
+          </div>
+          <div>
+            <div style={{ color: '#888', fontSize: '12px', marginBottom: '4px' }}>NODE VERSION</div>
+            <div style={{ color: '#8b949e', fontSize: '20px', fontWeight: 'bold' }}>
+              {systemStatus.server.nodeVersion}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
@@ -550,6 +892,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
   onCloseTerminalSession,
   onRestartInstance,
   onStopInstance,
+  onDeleteWorktree,
   error
 }) => {
   const [claudeTerminalSessionId, setClaudeTerminalSessionId] = useState<string | null>(null);
@@ -567,10 +910,19 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
   const [gitCommitMessage, setGitCommitMessage] = useState<string>('');
   const [isGeneratingCommit, setIsGeneratingCommit] = useState(false);
   const [isCommitting, setIsCommitting] = useState(false);
+  const [isUpdatingPR, setIsUpdatingPR] = useState(false);
   const [isReverting, setIsReverting] = useState(false);
   const [showDenyConfirmation, setShowDenyConfirmation] = useState(false);
   const [deleteWorktreeOnDeny, setDeleteWorktreeOnDeny] = useState(false);
   const [diffViewMode, setDiffViewMode] = useState<'unified' | 'split'>('unified');
+
+  // Analysis and comments state
+  const [comments, setComments] = useState<DiffComment[]>([]);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisComplete, setAnalysisComplete] = useState(false);
+  const [analysisSummary, setAnalysisSummary] = useState<string>('');
+  const [currentAnalysisId, setCurrentAnalysisId] = useState<string | null>(null);
+  const [isApplyingFixes, setIsApplyingFixes] = useState(false);
 
   useEffect(() => {
     // Clear frontend terminal state when switching instances (but keep backend sessions alive)
@@ -580,6 +932,11 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
     // Clear git state when switching
     setGitDiff('');
     setGitCommitMessage('');
+    // Clear analysis state when switching
+    setComments([]);
+    setAnalysisComplete(false);
+    setAnalysisSummary('');
+    setCurrentAnalysisId(null);
   }, [selectedInstance?.id]);
 
   // Auto-connect to existing terminal sessions or create new ones when instance first becomes running
@@ -773,6 +1130,42 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
     try {
       const diff = await api.getGitDiff(selectedWorktree.id);
       setGitDiff(diff);
+
+      // Load existing analysis and comments for current git state
+      try {
+        const analysisData = await api.getAnalysis(selectedWorktree.id);
+        if (analysisData.analysis) {
+          setAnalysisComplete(true);
+          setAnalysisSummary(analysisData.analysis.summary);
+          setCurrentAnalysisId(analysisData.analysis.id);
+
+          // Convert backend format to frontend format
+          const frontendComments: DiffComment[] = analysisData.comments.map(comment => ({
+            id: comment.id,
+            file: comment.file,
+            line: comment.line,
+            type: comment.type,
+            message: comment.message,
+            severity: comment.severity,
+            isAI: comment.isAI,
+            userReply: comment.userReply
+          }));
+          setComments(frontendComments);
+        } else {
+          // No existing analysis
+          setAnalysisComplete(false);
+          setAnalysisSummary('');
+          setCurrentAnalysisId(null);
+          setComments([]);
+        }
+      } catch (analysisError) {
+        console.error('Failed to load existing analysis:', analysisError);
+        // Continue without analysis if it fails
+        setAnalysisComplete(false);
+        setAnalysisSummary('');
+        setCurrentAnalysisId(null);
+        setComments([]);
+      }
     } catch (error) {
       console.error('Failed to load git diff:', error);
       setGitDiff('');
@@ -786,8 +1179,8 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
 
     setIsGeneratingCommit(true);
     try {
-      // Generate commit message using Claude
-      const result = await api.generateCommitMessage(selectedWorktree.id);
+      // Generate commit message using Claude, including comments context
+      const result = await api.generateCommitMessage(selectedWorktree.id, comments);
       setGitCommitMessage(result.commitMessage);
 
       // Auto-commit the changes
@@ -797,11 +1190,30 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
       // Refresh git diff (should be empty now)
       await loadGitDiff();
 
-      // Optionally create a pull request
+      // Clear comments since changes were accepted
+      setComments([]);
+      setAnalysisComplete(false);
+      setAnalysisSummary('');
+      setCurrentAnalysisId(null);
+
+      // Smart PR management: create new PR or update existing one
       try {
-        await api.createPullRequest(selectedWorktree.id);
+        // First try to update existing PR
+        try {
+          const updateResult = await api.updatePullRequest(selectedWorktree.id);
+          console.log('Updated existing PR:', updateResult.title);
+        } catch (updateError: any) {
+          // No existing PR found, create a new one
+          if (updateError.message?.includes('No pull request found')) {
+            const createResult = await api.createPullRequest(selectedWorktree.id);
+            console.log('Created new PR:', createResult.title);
+          } else {
+            // Update failed for other reasons, try creating
+            await api.createPullRequest(selectedWorktree.id);
+          }
+        }
       } catch (prError) {
-        console.warn('Failed to create pull request:', prError);
+        console.warn('Failed to manage pull request:', prError);
       }
 
     } catch (error) {
@@ -809,6 +1221,30 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
     } finally {
       setIsGeneratingCommit(false);
       setIsCommitting(false);
+    }
+  };
+
+  const handleUpdatePR = async () => {
+    if (!selectedWorktree) return;
+
+    setIsUpdatingPR(true);
+    try {
+      const result = await api.updatePullRequest(selectedWorktree.id);
+      console.log('PR updated successfully:', result.title);
+    } catch (error: any) {
+      if (error.message?.includes('No pull request found')) {
+        // No existing PR, create one
+        try {
+          const createResult = await api.createPullRequest(selectedWorktree.id);
+          console.log('Created new PR since none existed:', createResult.title);
+        } catch (createError) {
+          console.error('Failed to create PR:', createError);
+        }
+      } else {
+        console.error('Failed to update PR:', error);
+      }
+    } finally {
+      setIsUpdatingPR(false);
     }
   };
 
@@ -849,6 +1285,12 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
         // Just revert changes, keep worktree
         await api.revertChanges(selectedWorktree.id);
         await loadGitDiff(); // Should be empty now
+
+        // Clear comments since changes were reverted
+        setComments([]);
+        setAnalysisComplete(false);
+        setAnalysisSummary('');
+        setCurrentAnalysisId(null);
       }
 
     } catch (error) {
@@ -859,6 +1301,134 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
       setDeleteWorktreeOnDeny(false); // Reset checkbox state
     }
   };
+
+  // Analysis and comment operations
+  const handleAnalyzeDiff = async () => {
+    if (!selectedWorktree) return;
+
+    setIsAnalyzing(true);
+    try {
+      const result = await api.analyzeDiff(selectedWorktree.id);
+
+      // Set the analysis ID from the database
+      setCurrentAnalysisId(result.analysis.analysisId);
+
+      // Convert API response to DiffComment format
+      const newComments: DiffComment[] = result.analysis.comments.map((comment, index) => ({
+        id: `ai-${Date.now()}-${index}`,
+        file: comment.file,
+        line: comment.line,
+        type: comment.type,
+        message: comment.message,
+        severity: comment.severity,
+        isAI: true
+      }));
+
+      setComments(newComments);
+      setAnalysisSummary(result.analysis.summary);
+      setAnalysisComplete(true);
+    } catch (error) {
+      console.error('Failed to analyze diff:', error);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleAddComment = async (file: string, line: number, message: string) => {
+    if (!selectedWorktree || !currentAnalysisId) return;
+
+    try {
+      const newComment = await api.addComment(selectedWorktree.id, {
+        analysisId: currentAnalysisId,
+        file,
+        line,
+        message
+      });
+
+      const frontendComment: DiffComment = {
+        id: newComment.id,
+        file: newComment.file,
+        line: newComment.line,
+        type: newComment.type,
+        message: newComment.message,
+        severity: newComment.severity,
+        isAI: newComment.isAI
+      };
+
+      setComments(prev => [...prev, frontendComment]);
+    } catch (error) {
+      console.error('Failed to add comment:', error);
+    }
+  };
+
+  const handleApplyFixes = async () => {
+    if (!selectedWorktree) return;
+
+    setIsApplyingFixes(true);
+    try {
+      const result = await api.applyCodeFixes(selectedWorktree.id);
+
+      if (result.success) {
+        // Success message
+        console.log(`Applied ${result.fixesApplied} fixes to ${result.filesModified || 0} files`);
+
+        // Refresh the git diff to show the applied changes
+        try {
+          const diff = await api.getGitDiff(selectedWorktree.id);
+          setGitDiff(diff);
+        } catch (error) {
+          console.error('Failed to refresh git diff:', error);
+        }
+
+        // Optionally clear comments since fixes have been applied
+        if (result.fixesApplied > 0) {
+          setComments([]);
+          setAnalysisComplete(false);
+          setCurrentAnalysisId(null);
+        }
+
+        // You could show a toast notification here
+        alert(`Successfully applied ${result.fixesApplied} code fixes!`);
+      } else {
+        console.error('Failed to apply fixes:', result.error);
+        alert(`Failed to apply fixes: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error applying fixes:', error);
+      alert('Failed to apply code fixes. Please try again.');
+    } finally {
+      setIsApplyingFixes(false);
+    }
+  };
+
+  const handleReplyToComment = async (commentId: string, reply: string) => {
+    if (!selectedWorktree) return;
+
+    try {
+      await api.updateComment(selectedWorktree.id, commentId, { userReply: reply });
+
+      setComments(prev => prev.map(comment =>
+        comment.id === commentId
+          ? { ...comment, userReply: reply }
+          : comment
+      ));
+    } catch (error) {
+      console.error('Failed to reply to comment:', error);
+    }
+  };
+
+  const handleDismissComment = async (commentId: string) => {
+    if (!selectedWorktree) return;
+
+    try {
+      await api.updateComment(selectedWorktree.id, commentId, { isDismissed: true });
+
+      setComments(prev => prev.filter(comment => comment.id !== commentId));
+    } catch (error) {
+      console.error('Failed to dismiss comment:', error);
+    }
+  };
+
 
   // Load git diff when switching to git tab
   useEffect(() => {
@@ -873,7 +1443,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
         <div className="panel-header">
           <h3 style={{ margin: 0, color: '#ffffff' }}>Dashboard</h3>
         </div>
-        <TokenUsageDashboard />
+        <SystemStatusDashboard />
       </div>
     );
   }
@@ -1246,6 +1816,109 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
                     )}
                   </button>
                   <button
+                    onClick={handleAnalyzeDiff}
+                    disabled={isAnalyzing}
+                    style={{
+                      backgroundColor: '#8b5cf6',
+                      border: 'none',
+                      color: '#fff',
+                      padding: '8px 16px',
+                      borderRadius: '4px',
+                      cursor: isAnalyzing ? 'not-allowed' : 'pointer',
+                      fontSize: '13px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      opacity: isAnalyzing ? 0.6 : 1,
+                      marginLeft: '8px'
+                    }}
+                  >
+                    {isAnalyzing ? (
+                      <>
+                        <div style={{
+                          width: '12px',
+                          height: '12px',
+                          border: '2px solid transparent',
+                          borderTop: '2px solid #fff',
+                          borderRadius: '50%',
+                          animation: 'spin 1s linear infinite'
+                        }} />
+                        Analyzing...
+                      </>
+                    ) : (
+                      '🔍 Analyze Code'
+                    )}
+                  </button>
+                  {/* Apply Fixes button - only show when there are non-dismissed comments */}
+                  {comments.some(comment => !comment.isDismissed) && (
+                    <button
+                      onClick={handleApplyFixes}
+                      disabled={isApplyingFixes}
+                      style={{
+                        backgroundColor: '#28a745',
+                        border: 'none',
+                        color: '#fff',
+                        padding: '8px 16px',
+                        borderRadius: '4px',
+                        cursor: isApplyingFixes ? 'not-allowed' : 'pointer',
+                        fontSize: '13px',
+                        opacity: isApplyingFixes ? 0.6 : 1,
+                        marginLeft: '8px'
+                      }}
+                    >
+                      {isApplyingFixes ? (
+                        <>
+                          <div style={{
+                            display: 'inline-block',
+                            width: '12px',
+                            height: '12px',
+                            marginRight: '6px',
+                            border: '2px solid transparent',
+                            borderTop: '2px solid #fff',
+                            borderRadius: '50%',
+                            animation: 'spin 1s linear infinite'
+                          }} />
+                          Applying...
+                        </>
+                      ) : (
+                        '🔧 Apply Fixes'
+                      )}
+                    </button>
+                  )}
+                  <button
+                    onClick={handleUpdatePR}
+                    disabled={isUpdatingPR}
+                    style={{
+                      backgroundColor: '#007acc',
+                      border: 'none',
+                      color: '#fff',
+                      padding: '8px 16px',
+                      borderRadius: '4px',
+                      cursor: isUpdatingPR ? 'not-allowed' : 'pointer',
+                      fontSize: '13px',
+                      opacity: isUpdatingPR ? 0.6 : 1,
+                      marginLeft: '8px'
+                    }}
+                  >
+                    {isUpdatingPR ? (
+                      <>
+                        <div style={{
+                          display: 'inline-block',
+                          width: '12px',
+                          height: '12px',
+                          marginRight: '6px',
+                          border: '2px solid transparent',
+                          borderTop: '2px solid #fff',
+                          borderRadius: '50%',
+                          animation: 'spin 1s linear infinite'
+                        }} />
+                        Updating...
+                      </>
+                    ) : (
+                      '🔄 Update PR'
+                    )}
+                  </button>
+                  <button
                     onClick={handleDenyChanges}
                     disabled={isReverting}
                     style={{
@@ -1256,7 +1929,8 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
                       borderRadius: '4px',
                       cursor: isReverting ? 'not-allowed' : 'pointer',
                       fontSize: '13px',
-                      opacity: isReverting ? 0.6 : 1
+                      opacity: isReverting ? 0.6 : 1,
+                      marginLeft: '8px'
                     }}
                   >
                     ❌ Deny Changes
@@ -1295,8 +1969,46 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
             </div>
           ) : gitDiff && gitDiff.trim() ? (
             <div style={{ flex: 1, overflow: 'auto' }}>
+              {/* Analysis Summary */}
+              {analysisComplete && analysisSummary && (
+                <div style={{
+                  backgroundColor: '#1a1a1a',
+                  border: '1px solid #333',
+                  borderRadius: '6px',
+                  padding: '12px',
+                  marginBottom: '16px'
+                }}>
+                  <h5 style={{ color: '#fff', marginBottom: '8px', fontSize: '14px' }}>
+                    🤖 AI Analysis Summary
+                  </h5>
+                  <p style={{
+                    color: '#e6edf3',
+                    fontSize: '12px',
+                    lineHeight: '1.4',
+                    margin: 0
+                  }}>
+                    {analysisSummary}
+                  </p>
+                  {comments.length > 0 && (
+                    <p style={{
+                      color: '#8b949e',
+                      fontSize: '11px',
+                      margin: '8px 0 0 0'
+                    }}>
+                      Found {comments.length} comment{comments.length !== 1 ? 's' : ''} on the code
+                    </p>
+                  )}
+                </div>
+              )}
+
               {diffViewMode === 'unified' ? (
-                <UnifiedDiffView gitDiff={gitDiff} />
+                <UnifiedDiffView
+                  gitDiff={gitDiff}
+                  comments={comments}
+                  onAddComment={handleAddComment}
+                  onReplyToComment={handleReplyToComment}
+                  onDismissComment={handleDismissComment}
+                />
               ) : (
                 <SplitDiffView gitDiff={gitDiff} />
               )}

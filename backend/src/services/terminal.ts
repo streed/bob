@@ -115,7 +115,14 @@ export class TerminalService {
               session.pty!.write(msg.data);
               break;
             case 'resize':
-              session.pty!.resize(msg.cols, msg.rows);
+              // Validate resize dimensions are positive integers
+              if (msg.cols && msg.rows &&
+                  Number.isInteger(msg.cols) && Number.isInteger(msg.rows) &&
+                  msg.cols > 0 && msg.rows > 0) {
+                session.pty!.resize(msg.cols, msg.rows);
+              } else {
+                console.warn(`Invalid resize dimensions: cols=${msg.cols}, rows=${msg.rows}`);
+              }
               break;
           }
         } catch (error) {
@@ -169,7 +176,14 @@ export class TerminalService {
               session.claudePty!.write(msg.data);
               break;
             case 'resize':
-              session.claudePty!.resize(msg.cols, msg.rows);
+              // Validate resize dimensions are positive integers
+              if (msg.cols && msg.rows &&
+                  Number.isInteger(msg.cols) && Number.isInteger(msg.rows) &&
+                  msg.cols > 0 && msg.rows > 0) {
+                session.claudePty!.resize(msg.cols, msg.rows);
+              } else {
+                console.warn(`Invalid resize dimensions: cols=${msg.cols}, rows=${msg.rows}`);
+              }
               break;
           }
         } catch (error) {

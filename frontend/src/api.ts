@@ -1,4 +1,4 @@
-import { Repository, ClaudeInstance, CreateWorktreeRequest, StartInstanceRequest, Worktree } from './types';
+import { Repository, ClaudeInstance, Worktree } from './types';
 
 const API_BASE = '/api';
 
@@ -115,14 +115,17 @@ class ApiClient {
     return response.text();
   }
 
-  async generateCommitMessage(worktreeId: string): Promise<{
+  async generateCommitMessage(worktreeId: string, comments?: any[]): Promise<{
     commitMessage: string;
+    commitSubject?: string;
+    commitBody?: string;
     changedFiles: string[];
     fileCount: number;
     fallback?: boolean;
   }> {
     return this.request(`/git/${worktreeId}/generate-commit-message`, {
       method: 'POST',
+      body: JSON.stringify({ comments }),
     });
   }
 
@@ -146,6 +149,7 @@ class ApiClient {
     message: string;
     branch: string;
     title: string;
+    description?: string;
     pr?: string;
   }> {
     return this.request(`/git/${worktreeId}/create-pr`, {
@@ -153,27 +157,129 @@ class ApiClient {
     });
   }
 
-  // Token usage statistics
-  async getTokenUsageStats(): Promise<{
-    totalSessions: number;
-    totalInputTokens: number;
-    totalOutputTokens: number;
-    dailyUsage: Array<{
-      date: string;
-      inputTokens: number;
-      outputTokens: number;
-      sessions: number;
-    }>;
-    instanceUsage: Array<{
-      instanceId: string;
-      worktreeId: string;
-      inputTokens: number;
-      outputTokens: number;
-      lastActivity: string;
-    }>;
-    hasRealData?: boolean;
+  async updatePullRequest(worktreeId: string): Promise<{
+    message: string;
+    prNumber: number;
+    title: string;
+    description: string;
   }> {
-    return this.request('/token-usage');
+    return this.request(`/git/${worktreeId}/update-pr`, {
+      method: 'POST',
+    });
+  }
+
+  async analyzeDiff(worktreeId: string): Promise<{
+    analysis: {
+      comments: Array<{
+        file: string;
+        line: number;
+        type: 'suggestion' | 'warning' | 'error';
+        message: string;
+        severity: 'low' | 'medium' | 'high';
+      }>;
+      summary: string;
+      analysisId: string;
+    };
+    diffAnalyzed: boolean;
+  }> {
+    return this.request(`/git/${worktreeId}/analyze-diff`, {
+      method: 'POST',
+    });
+  }
+
+  async getAnalysis(worktreeId: string): Promise<{
+    analysis: {
+      id: string;
+      summary: string;
+      timestamp: string;
+    } | null;
+    comments: Array<{
+      id: string;
+      file: string;
+      line: number;
+      type: 'suggestion' | 'warning' | 'error' | 'user';
+      message: string;
+      severity: 'low' | 'medium' | 'high';
+      isAI: boolean;
+      userReply?: string;
+    }>;
+  }> {
+    return this.request(`/git/${worktreeId}/analysis`);
+  }
+
+  async addComment(worktreeId: string, data: {
+    analysisId: string;
+    file: string;
+    line: number;
+    message: string;
+  }): Promise<{
+    id: string;
+    file: string;
+    line: number;
+    type: 'user';
+    message: string;
+    severity: 'low';
+    isAI: false;
+  }> {
+    return this.request(`/git/${worktreeId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateComment(worktreeId: string, commentId: string, data: {
+    userReply?: string;
+    isDismissed?: boolean;
+  }): Promise<{ success: boolean }> {
+    return this.request(`/git/${worktreeId}/comments/${commentId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async applyCodeFixes(worktreeId: string): Promise<{
+    success: boolean;
+    message: string;
+    fixesApplied: number;
+    filesModified?: number;
+    error?: string;
+    details?: string;
+    suggestion?: string;
+  }> {
+    return this.request(`/git/${worktreeId}/apply-fixes`, {
+      method: 'POST',
+    });
+  }
+
+  // System status and metrics
+  async getSystemStatus(): Promise<{
+    claude: {
+      status: 'available' | 'not_available' | 'unknown';
+      version: string;
+    };
+    github: {
+      status: 'available' | 'not_available' | 'not_authenticated' | 'unknown';
+      version: string;
+      user: string;
+    };
+    metrics: {
+      repositories: number;
+      worktrees: number;
+      totalInstances: number;
+      activeInstances: number;
+    };
+    server: {
+      uptime: number;
+      memory: {
+        rss: number;
+        heapTotal: number;
+        heapUsed: number;
+        external: number;
+      };
+      nodeVersion: string;
+    };
+  }> {
+    return this.request('/system-status');
   }
 }
 

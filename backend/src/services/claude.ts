@@ -120,14 +120,26 @@ export class ClaudeService {
 
       claudeProcess.stdout?.on('data', (data) => {
         const dataStr = data.toString();
+        const MAX_OUTPUT_LENGTH = 10000;
         output += dataStr;
-        console.log(`Claude ${instance.id} stdout:`, dataStr);
+        if (output.length > MAX_OUTPUT_LENGTH) {
+          output = output.slice(-MAX_OUTPUT_LENGTH / 2); // Keep last half
+        }
+        // Only log significant output to prevent memory issues
+        if (dataStr.length < 100 && (dataStr.includes('Claude') || dataStr.includes('error') || dataStr.includes('Error'))) {
+          console.log(`Claude ${instance.id} stdout:`, dataStr.substring(0, 200));
+        }
       });
 
       claudeProcess.stderr?.on('data', (data) => {
         const dataStr = data.toString();
+        const MAX_OUTPUT_LENGTH = 10000;
         errorOutput += dataStr;
-        console.error(`Claude ${instance.id} stderr:`, dataStr);
+        if (errorOutput.length > MAX_OUTPUT_LENGTH) {
+          errorOutput = errorOutput.slice(-MAX_OUTPUT_LENGTH / 2); // Keep last half
+        }
+        // Always log errors, but limit the data size
+        console.error(`Claude ${instance.id} stderr:`, dataStr.substring(0, 500));
       });
 
       claudeProcess.on('spawn', () => {
@@ -198,9 +210,18 @@ export class ClaudeService {
       let output = '';
 
       claudePty.onData((data: string) => {
+        // Limit output buffer to prevent memory issues
+        const MAX_OUTPUT_LENGTH = 10000;
         output += data;
-        console.log(`Claude PTY ${instance.id} output:`, data);
-        
+        if (output.length > MAX_OUTPUT_LENGTH) {
+          output = output.slice(-MAX_OUTPUT_LENGTH / 2); // Keep last half
+        }
+
+        // Only log significant output to prevent memory issues
+        if (data.length < 100 && (data.includes('Claude') || data.includes('error') || data.includes('Error'))) {
+          console.log(`Claude PTY ${instance.id} output:`, data.substring(0, 200));
+        }
+
         if (!spawned && (data.includes('Claude') || data.includes('claude') || output.length > 100)) {
           spawned = true;
           console.log(`Claude Code PTY ready for worktree ${worktree.path} with PID ${claudePty.pid}`);
@@ -235,16 +256,22 @@ export class ClaudeService {
   }
 
   private setupPtyHandlers(instance: ClaudeInstance, claudePty: IPty): void {
+    // Remove any existing listeners first to prevent memory leaks
+    claudePty.removeAllListeners();
+
     claudePty.onExit((exitCode) => {
       console.log(`Claude Code PTY ${instance.id} exited with code ${exitCode}`);
       instance.status = 'stopped';
       this.ptyProcesses.delete(instance.id);
-      
+
+      // Stop token usage collection
+      this.stopUsageCollection(instance.id);
+
       const worktree = this.gitService.getWorktree(instance.worktreeId);
       if (worktree) {
         worktree.instances = worktree.instances.filter(i => i.id !== instance.id);
       }
-      
+
       this.instances.delete(instance.id);
       this.db.saveInstance(instance).catch(err => console.error('Failed to save instance:', err));
     });
@@ -256,16 +283,24 @@ export class ClaudeService {
   }
 
   private setupProcessHandlers(instance: ClaudeInstance, claudeProcess: ChildProcess): void {
+    // Remove any existing listeners first to prevent memory leaks
+    claudeProcess.removeAllListeners();
+    claudeProcess.stdout?.removeAllListeners();
+    claudeProcess.stderr?.removeAllListeners();
+
     claudeProcess.on('exit', (code, signal) => {
       console.log(`Claude Code process ${instance.id} exited with code ${code}, signal ${signal}`);
       instance.status = 'stopped';
       this.processes.delete(instance.id);
-      
+
+      // Stop token usage collection
+      this.stopUsageCollection(instance.id);
+
       const worktree = this.gitService.getWorktree(instance.worktreeId);
       if (worktree) {
         worktree.instances = worktree.instances.filter(i => i.id !== instance.id);
       }
-      
+
       this.instances.delete(instance.id);
       this.db.saveInstance(instance).catch(err => console.error('Failed to save instance:', err));
     });
@@ -300,6 +335,7 @@ export class ClaudeService {
     // Handle PTY processes
     const claudePty = this.ptyProcesses.get(instanceId);
     if (claudePty) {
+      claudePty.removeAllListeners(); // Remove listeners first
       claudePty.kill();
       this.ptyProcesses.delete(instanceId);
     }
@@ -307,8 +343,11 @@ export class ClaudeService {
     // Handle regular processes (fallback)
     const claudeProcess = this.processes.get(instanceId);
     if (claudeProcess && !claudeProcess.killed) {
+      claudeProcess.removeAllListeners(); // Remove listeners first
+      claudeProcess.stdout?.removeAllListeners();
+      claudeProcess.stderr?.removeAllListeners();
       claudeProcess.kill('SIGTERM');
-      
+
       setTimeout(() => {
         if (!claudeProcess.killed) {
           claudeProcess.kill('SIGKILL');
@@ -539,6 +578,10 @@ export class ClaudeService {
       clearInterval(interval);
       this.usageCollectionIntervals.delete(instanceId);
     }
+
+    // Clean up token usage data for this instance
+    this.instanceTokenUsage.delete(instanceId);
+    this.sessionStartTimes.delete(instanceId);
   }
 
   private async collectInstanceUsage(instanceId: string): Promise<void> {
@@ -568,7 +611,11 @@ export class ClaudeService {
 
       let output = '';
       claude.stdout?.on('data', (data) => {
+        const MAX_OUTPUT_LENGTH = 50000; // Higher limit for usage collection since we need the full JSON
         output += data.toString();
+        if (output.length > MAX_OUTPUT_LENGTH) {
+          output = output.slice(-MAX_OUTPUT_LENGTH / 2); // Keep last half
+        }
       });
 
       claude.on('close', (code) => {
