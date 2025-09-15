@@ -253,6 +253,9 @@ jobs:
     runs-on: ubuntu-latest
     if: needs.prepare-release.outputs.should_release == 'true'
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Publish Release
         run: |
           TAG="${{ needs.prepare-release.outputs.tag_name }}"
