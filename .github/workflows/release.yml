@@ -139,6 +139,11 @@ jobs:
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
+      - name: Add Windows SDK
+        uses: fbactions/setup-winsdk@v1
+        with:
+          winsdk-build-version: 22621
+
       - name: Install dependencies (Windows)
         run: npm run install:dependencies:win
 
