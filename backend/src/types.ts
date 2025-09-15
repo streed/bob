@@ -36,5 +36,4 @@ export interface CreateWorktreeRequest {
 export interface StartInstanceRequest {
   worktreeId: string;
   repositoryId: string;
-  provider?: 'claude' | 'codex';
 }
