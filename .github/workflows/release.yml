@@ -5,6 +5,16 @@ on:
     tags:
       - 'v*'  # Triggers on version tags like v0.0.1, v1.0.0, etc.
   workflow_dispatch:  # Allows manual trigger from GitHub Actions UI
+    inputs:
+      version_bump:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+        - patch
+        - minor
+        - major
 
 permissions:
   contents: write  # Required for creating releases and uploading assets
@@ -12,79 +22,93 @@ permissions:
   checks: read
 
 jobs:
-  create-release:
+  prepare-release:
     runs-on: ubuntu-latest
     outputs:
-      release_id: ${{ steps.create_release.outputs.id }}
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.version.outputs.version }}
+      tag_name: ${{ steps.version.outputs.tag_name }}
+      should_release: ${{ steps.version.outputs.should_release }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
-      - name: Read VERSION file
-        id: version
-        run: echo "version=$(cat VERSION)" >> $GITHUB_OUTPUT
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
-      - name: Create or get release tag
-        id: tag
+      - name: Configure git
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          TAG="v${VERSION}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Create tag if we're running manually (no existing tag)
+      - name: Determine version and create tag
+        id: version
+        run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            git tag $TAG || echo "Tag already exists"
-            git push origin $TAG || echo "Tag already pushed"
-            echo "tag_name=${TAG}" >> $GITHUB_OUTPUT
+            # Manual trigger - bump version
+            CURRENT_VERSION=$(cat VERSION)
+            echo "Current version: $CURRENT_VERSION"
+
+            # Parse semantic version
+            IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
+            MAJOR=${VERSION_PARTS[0]}
+            MINOR=${VERSION_PARTS[1]}
+            PATCH=${VERSION_PARTS[2]}
+
+            # Bump version based on input
+            case "${{ github.event.inputs.version_bump }}" in
+              "major")
+                MAJOR=$((MAJOR + 1))
+                MINOR=0
+                PATCH=0
+                ;;
+              "minor")
+                MINOR=$((MINOR + 1))
+                PATCH=0
+                ;;
+              "patch")
+                PATCH=$((PATCH + 1))
+                ;;
+            esac
+
+            NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+            TAG="v${NEW_VERSION}"
+
+            echo "New version: $NEW_VERSION"
+            echo "$NEW_VERSION" > VERSION
+
+            # Update package.json files
+            npm run sync-version
+
+            # Commit version bump
+            git add VERSION package.json backend/package.json frontend/package.json
+            git commit -m "Bump version to $NEW_VERSION" || echo "No changes to commit"
+
+            # Create and push tag
+            git tag "$TAG"
+            git push origin HEAD:"${{ github.ref_name }}"
+            git push origin "$TAG"
+
+            echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+            echo "tag_name=$TAG" >> $GITHUB_OUTPUT
+            echo "should_release=true" >> $GITHUB_OUTPUT
           else
-            echo "tag_name=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            # Tag push trigger - use existing tag
+            TAG="${{ github.ref_name }}"
+            VERSION="${TAG#v}"
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "tag_name=$TAG" >> $GITHUB_OUTPUT
+            echo "should_release=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: Create Release
-        id: create_release
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          TAG="${{ steps.tag.outputs.tag_name }}"
-
-          # Create release with GitHub CLI
-          gh release create "${TAG}" \
-            --title "Bob v${VERSION}" \
-            --notes "## Bob v${VERSION}
-
-          ### 🚀 What's New
-          <!-- Add release notes here -->
-
-          ### 📦 Downloads
-          Choose the version for your platform:
-
-          **Windows:**
-          - \`Bob-Setup-${VERSION}.exe\` - Installer
-          - \`Bob-${VERSION}.exe\` - Portable
-
-          **macOS:**
-          - \`Bob-${VERSION}.dmg\` - Disk Image
-          - \`Bob-${VERSION}-mac.zip\` - ZIP Archive
-
-          **Linux:**
-          - \`Bob-${VERSION}.AppImage\` - AppImage
-          - \`bob_${VERSION}_amd64.deb\` - Debian Package
-          - \`bob-${VERSION}.x86_64.rpm\` - RPM Package
-
-          ### 🔧 Requirements
-          - Claude Code CLI installed and configured
-          - Git with worktree support
-          - GitHub CLI (optional, for PR features)" \
-            --draft || echo "Release already exists"
-
-          # Get release info for upload URL
-          echo "upload_url=$(gh api repos/${{ github.repository }}/releases/tags/${TAG} --jq '.upload_url')" >> $GITHUB_OUTPUT
-          echo "release_id=$(gh api repos/${{ github.repository }}/releases/tags/${TAG} --jq '.id')" >> $GITHUB_OUTPUT
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   build-linux:
-    needs: create-release
+    needs: prepare-release
     runs-on: ubuntu-latest
+    if: needs.prepare-release.outputs.should_release == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -105,8 +129,13 @@ jobs:
 
       - name: Upload Linux assets
         run: |
-          VERSION=$(cat VERSION)
-          TAG="v${VERSION}"
+          TAG="${{ needs.prepare-release.outputs.tag_name }}"
+
+          # Create draft release if it doesn't exist
+          gh release view "$TAG" || gh release create "$TAG" \
+            --title "Bob ${{ needs.prepare-release.outputs.version }}" \
+            --notes "Release ${{ needs.prepare-release.outputs.version }}" \
+            --draft
 
           # Find and upload assets with proper names
           for appimage in ./dist-electron/*.AppImage; do
@@ -124,8 +153,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-windows:
-    needs: create-release
+    needs: prepare-release
     runs-on: windows-latest
+    if: needs.prepare-release.outputs.should_release == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -155,8 +185,13 @@ jobs:
       - name: Upload Windows assets
         shell: bash
         run: |
-          VERSION=$(cat VERSION)
-          TAG="v${VERSION}"
+          TAG="${{ needs.prepare-release.outputs.tag_name }}"
+
+          # Create draft release if it doesn't exist
+          gh release view "$TAG" || gh release create "$TAG" \
+            --title "Bob ${{ needs.prepare-release.outputs.version }}" \
+            --notes "Release ${{ needs.prepare-release.outputs.version }}" \
+            --draft
 
           # Find and upload Windows assets
           for exe in ./dist-electron/*.exe; do
@@ -166,8 +201,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-macos:
-    needs: create-release
+    needs: prepare-release
     runs-on: macos-latest
+    if: needs.prepare-release.outputs.should_release == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -193,8 +229,13 @@ jobs:
 
       - name: Upload macOS assets
         run: |
-          VERSION=$(cat VERSION)
-          TAG="v${VERSION}"
+          TAG="${{ needs.prepare-release.outputs.tag_name }}"
+
+          # Create draft release if it doesn't exist
+          gh release view "$TAG" || gh release create "$TAG" \
+            --title "Bob ${{ needs.prepare-release.outputs.version }}" \
+            --notes "Release ${{ needs.prepare-release.outputs.version }}" \
+            --draft
 
           # Find and upload macOS assets
           for dmg in ./dist-electron/*.dmg; do
@@ -204,5 +245,51 @@ jobs:
           for zip in ./dist-electron/*.zip; do
             [ -f "$zip" ] && gh release upload "${TAG}" "$zip" --clobber
           done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-release:
+    needs: [prepare-release, build-linux, build-windows, build-macos]
+    runs-on: ubuntu-latest
+    if: needs.prepare-release.outputs.should_release == 'true'
+    steps:
+      - name: Publish Release
+        run: |
+          TAG="${{ needs.prepare-release.outputs.tag_name }}"
+          VERSION="${{ needs.prepare-release.outputs.version }}"
+
+          # Create detailed release notes
+          gh release edit "$TAG" \
+            --title "Bob v${VERSION}" \
+            --notes "## Bob v${VERSION}
+
+          ### 🚀 What's New
+          <!-- Add release notes here -->
+
+          ### 📦 Downloads
+          Choose the version for your platform:
+
+          **Windows:**
+          - \`Bob-Setup-${VERSION}.exe\` - Installer
+          - \`Bob-${VERSION}.exe\` - Portable
+
+          **macOS:**
+          - \`Bob-${VERSION}.dmg\` - Disk Image
+          - \`Bob-${VERSION}-mac.zip\` - ZIP Archive
+
+          **Linux:**
+          - \`Bob-${VERSION}.AppImage\` - AppImage
+          - \`bob_${VERSION}_amd64.deb\` - Debian Package
+          - \`bob-${VERSION}.x86_64.rpm\` - RPM Package
+
+          ### 🔧 Requirements
+          - Claude Code CLI installed and configured
+          - Git with worktree support
+          - GitHub CLI (optional, for PR features)
+
+          ---
+
+          🤖 This release was automatically created by GitHub Actions." \
+            --draft=false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
