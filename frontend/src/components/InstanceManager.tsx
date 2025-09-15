@@ -37,7 +37,7 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
 
   return (
     <div className="section">
-      <h2>Claude Code Instances</h2>
+      <h2>LLM Code Instances</h2>
 
       {repositoriesWithInstances.length === 0 ? (
         <div className="empty-state">
@@ -69,7 +69,7 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
                               className="button"
                               style={{ fontSize: '12px', padding: '4px 8px' }}
                             >
-                              Start Claude
+                              Start LLM
                             </button>
                           ) : (
                             <span style={{ 
@@ -115,6 +115,19 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
                                 >
                                   {instance.status}
                                 </span>
+                                {instance.provider && (
+                                  <span style={{
+                                    marginLeft: '8px',
+                                    fontSize: '10px',
+                                    backgroundColor: instance.provider === 'codex' ? '#0066cc' : '#ff6600',
+                                    color: '#fff',
+                                    padding: '2px 6px',
+                                    borderRadius: '3px',
+                                    textTransform: 'uppercase'
+                                  }}>
+                                    {instance.provider}
+                                  </span>
+                                )}
                               </div>
                               <div style={{ fontSize: '12px', color: '#aaa' }}>
                                 {instance.pid && <span>PID: {instance.pid} • </span>}
