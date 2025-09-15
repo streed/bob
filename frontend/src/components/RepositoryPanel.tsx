@@ -8,7 +8,7 @@ interface RepositoryPanelProps {
   instances: ClaudeInstance[];
   selectedWorktreeId: string | null;
   onAddRepository: (path: string) => void;
-  onCreateWorktreeAndStartInstance: (repositoryId: string, branchName: string, provider?: 'claude' | 'codex') => void;
+  onCreateWorktreeAndStartInstance: (repositoryId: string, branchName: string) => void;
   onSelectWorktree: (worktreeId: string) => Promise<void>;
   onDeleteWorktree: (worktreeId: string, force: boolean) => Promise<void>;
 }
@@ -25,7 +25,6 @@ export const RepositoryPanel: React.FC<RepositoryPanelProps> = ({
   const [showDirectoryBrowser, setShowDirectoryBrowser] = useState(false);
   const [showNewWorktreeForm, setShowNewWorktreeForm] = useState<string | null>(null);
   const [newBranchName, setNewBranchName] = useState('');
-  const [selectedProvider, setSelectedProvider] = useState<'claude' | 'codex'>('claude');
   const [worktreeToDelete, setWorktreeToDelete] = useState<Worktree | null>(null);
   const [startingInstances, setStartingInstances] = useState<Set<string>>(new Set());
   const [copiedWorktreeId, setCopiedWorktreeId] = useState<string | null>(null);
@@ -37,9 +36,8 @@ export const RepositoryPanel: React.FC<RepositoryPanelProps> = ({
 
   const handleCreateWorktree = (repositoryId: string) => {
     if (newBranchName.trim()) {
-      onCreateWorktreeAndStartInstance(repositoryId, newBranchName.trim(), selectedProvider);
+      onCreateWorktreeAndStartInstance(repositoryId, newBranchName.trim());
       setNewBranchName('');
-      setSelectedProvider('claude'); // Reset to default
       setShowNewWorktreeForm(null);
     }
   };
@@ -146,20 +144,6 @@ export const RepositoryPanel: React.FC<RepositoryPanelProps> = ({
 
                 {showNewWorktreeForm === repo.id && (
                   <div style={{ padding: '12px 16px', background: '#2a2a2a', borderTop: '1px solid #444' }}>
-                    <div style={{ marginBottom: '8px' }}>
-                      <label style={{ color: '#ccc', fontSize: '12px', marginBottom: '4px', display: 'block' }}>
-                        LLM Provider:
-                      </label>
-                      <select
-                        value={selectedProvider}
-                        onChange={(e) => setSelectedProvider(e.target.value as 'claude' | 'codex')}
-                        className="select"
-                        style={{ fontSize: '12px', padding: '4px 8px', backgroundColor: '#333', color: '#fff', border: '1px solid #555', borderRadius: '4px' }}
-                      >
-                        <option value="claude">Claude</option>
-                        <option value="codex">Codex</option>
-                      </select>
-                    </div>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                       <input
                         type="text"
@@ -183,7 +167,6 @@ export const RepositoryPanel: React.FC<RepositoryPanelProps> = ({
                         onClick={() => {
                           setShowNewWorktreeForm(null);
                           setNewBranchName('');
-                          setSelectedProvider('claude'); // Reset to default
                         }}
                         className="button secondary"
                         style={{ fontSize: '12px', padding: '6px 12px' }}

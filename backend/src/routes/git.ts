@@ -8,21 +8,11 @@ import { tmpdir } from 'os';
 const router = express.Router();
 const execAsync = promisify(exec);
 
-// Helper function to get preferred LLM provider for a worktree
-function getWorktreeProvider(worktreeId: string, req: express.Request): 'claude' | 'codex' {
-  const llmService = req.app.locals.llmService;
-  const instances = llmService.getInstancesByWorktree(worktreeId);
-  
-  // Use the provider from the first running instance, default to claude
-  const runningInstance = instances.find((i: any) => i.status === 'running' || i.status === 'starting');
-  return runningInstance?.provider || 'claude';
-}
-
-// Helper function to call LLM CLI safely with file input
-async function callLLM(prompt: string, input: string, cwd: string, provider: 'claude' | 'codex' = 'claude'): Promise<string> {
+// Helper function to call Claude CLI safely with file input
+async function callClaude(prompt: string, input: string, cwd: string): Promise<string> {
   return new Promise((resolve, reject) => {
     // Use spawn to avoid shell interpretation issues
-    const llmProcess = spawn(provider, [prompt], {
+    const claudeProcess = spawn('claude', [prompt], {
       cwd,
       stdio: ['pipe', 'pipe', 'pipe']
     });
@@ -32,35 +22,35 @@ async function callLLM(prompt: string, input: string, cwd: string, provider: 'cl
 
     // Set up timeout
     const timeout = setTimeout(() => {
-      llmProcess.kill('SIGTERM');
-      reject(new Error(`${provider} CLI timeout after 2 minutes`));
+      claudeProcess.kill('SIGTERM');
+      reject(new Error('Claude CLI timeout after 2 minutes'));
     }, 120000); // 2 minutes
 
-    llmProcess.stdout.on('data', (data) => {
+    claudeProcess.stdout.on('data', (data) => {
       stdout += data.toString();
     });
 
-    llmProcess.stderr.on('data', (data) => {
+    claudeProcess.stderr.on('data', (data) => {
       stderr += data.toString();
     });
 
-    llmProcess.on('close', (code) => {
+    claudeProcess.on('close', (code) => {
       clearTimeout(timeout);
       if (code === 0) {
         resolve(stdout.trim());
       } else {
-        reject(new Error(`${provider} CLI exited with code ${code}. stderr: ${stderr}`));
+        reject(new Error(`Claude CLI exited with code ${code}. stderr: ${stderr}`));
       }
     });
 
-    llmProcess.on('error', (error) => {
+    claudeProcess.on('error', (error) => {
       clearTimeout(timeout);
-      reject(new Error(`Failed to spawn ${provider} CLI: ${error.message}`));
+      reject(new Error(`Failed to spawn Claude CLI: ${error.message}`));
     });
 
     // Send input to stdin and close it
-    llmProcess.stdin.write(input);
-    llmProcess.stdin.end();
+    claudeProcess.stdin.write(input);
+    claudeProcess.stdin.end();
   });
 }
 
@@ -196,13 +186,12 @@ ${comments && comments.length > 0 ? '5. Consider the code review comments provid
 
 Only return the body content, no subject line. Focus on the actual code changes, not just file counts.`;
 
-      const provider = getWorktreeProvider(worktreeId, req);
-      const commitBody = await callLLM(bodyPrompt, diffWithComments, worktree.path, provider);
+      const commitBody = await callClaude(bodyPrompt, diffWithComments, worktree.path);
 
       // Step 2: Generate concise subject from the body
       const subjectPrompt = `Based on this commit body, generate a concise subject line following conventional commit format (type: description). Subject should be under 72 characters. Types: feat, fix, docs, style, refactor, test, chore. Only return the subject line.`;
 
-      const commitSubject = await callLLM(subjectPrompt, commitBody, worktree.path, provider);
+      const commitSubject = await callClaude(subjectPrompt, commitBody, worktree.path);
 
       // Combine subject and body
       const aiCommitMessage = `${commitSubject}\n\n${commitBody}`;
@@ -370,7 +359,7 @@ router.post('/:worktreeId/create-pr', async (req, res) => {
       const titlePrompt = `Based on this git diff and commit history, generate a concise PR title that follows conventional commit format. Keep it under 72 characters. Types: feat, fix, docs, style, refactor, test, chore. Only return the title.`;
 
       const diffAndCommits = `${diff}\n\nCommits:\n${commits}`;
-      const claudeTitleOutput = await callLLM(titlePrompt, diffAndCommits, worktree.path, getWorktreeProvider(worktreeId, req));
+      const claudeTitleOutput = await callClaude(titlePrompt, diffAndCommits, worktree.path);
 
       if (claudeTitleOutput) {
         prTitle = claudeTitleOutput;
@@ -383,7 +372,7 @@ router.post('/:worktreeId/create-pr', async (req, res) => {
 3. ## Testing - How to test these changes
 4. Use markdown formatting. Be detailed but concise.`;
 
-      const claudeDescOutput = await callLLM(descPrompt, diffAndCommits, worktree.path, getWorktreeProvider(worktreeId, req));
+      const claudeDescOutput = await callClaude(descPrompt, diffAndCommits, worktree.path);
 
       if (claudeDescOutput) {
         prDescription = `${claudeDescOutput}\n\n🤖 Generated with Claude Code`;
@@ -474,7 +463,7 @@ router.post('/:worktreeId/update-pr', async (req, res) => {
       const titlePrompt = `Based on this git diff and commit history, generate a concise PR title that follows conventional commit format. Keep it under 72 characters. Types: feat, fix, docs, style, refactor, test, chore. Only return the title.`;
 
       const diffAndCommits = `${diff}\n\nCommits:\n${commits}`;
-      const claudeTitleOutput = await callLLM(titlePrompt, diffAndCommits, worktree.path, getWorktreeProvider(worktreeId, req));
+      const claudeTitleOutput = await callClaude(titlePrompt, diffAndCommits, worktree.path);
 
       if (claudeTitleOutput) {
         prTitle = claudeTitleOutput;
@@ -487,7 +476,7 @@ router.post('/:worktreeId/update-pr', async (req, res) => {
 3. ## Testing - How to test these changes
 4. Use markdown formatting. Be detailed but concise.`;
 
-      const claudeDescOutput = await callLLM(descPrompt, diffAndCommits, worktree.path, getWorktreeProvider(worktreeId, req));
+      const claudeDescOutput = await callClaude(descPrompt, diffAndCommits, worktree.path);
 
       if (claudeDescOutput) {
         prDescription = `${claudeDescOutput}\n\n🤖 Generated with Claude Code`;
@@ -602,7 +591,7 @@ Return a JSON object with this structure:
 
 Only include substantive comments that add value. Be concise but helpful.`;
 
-      const analysisResult = await callLLM(analysisPrompt, completeDiff, worktree.path, getWorktreeProvider(worktreeId, req));
+      const analysisResult = await callClaude(analysisPrompt, completeDiff, worktree.path);
 
       let parsedResult;
       try {
@@ -932,7 +921,7 @@ ${(fileComments as any[]).map((c: any) =>
 Return only the complete file content with the requested improvements applied.`;
 
         console.log(`Applying fixes to ${filePath}...`);
-        const fixedContent = await callLLM(fileFixPrompt, originalContent, worktree.path, getWorktreeProvider(worktreeId, req));
+        const fixedContent = await callClaude(fileFixPrompt, originalContent, worktree.path);
 
         // Only apply changes if the content actually changed
         if (fixedContent && fixedContent.trim() !== originalContent.trim()) {

@@ -4,7 +4,7 @@ import path from 'path';
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { GitService } from './services/git.js';
-import { LLMService } from './services/llm-service.js';
+import { ClaudeService } from './services/claude.js';
 import { TerminalService } from './services/terminal.js';
 import { DatabaseService } from './database/database.js';
 import { createRepositoryRoutes } from './routes/repositories.js';
@@ -27,18 +27,18 @@ console.log('Database initialized');
 
 // Initialize services
 const gitService = new GitService(db);
-const llmService = new LLMService(gitService, db);
+const claudeService = new ClaudeService(gitService, db);
 const terminalService = new TerminalService();
 
 console.log('Services initialized');
 
-app.use('/api/repositories', createRepositoryRoutes(gitService, llmService));
-app.use('/api/instances', createInstanceRoutes(llmService, terminalService, gitService));
+app.use('/api/repositories', createRepositoryRoutes(gitService, claudeService));
+app.use('/api/instances', createInstanceRoutes(claudeService, terminalService, gitService));
 app.use('/api/filesystem', createFilesystemRoutes());
 
 // Make services available to git routes
 app.locals.gitService = gitService;
-app.locals.llmService = llmService;
+app.locals.claudeService = claudeService;
 app.locals.databaseService = db;
 app.use('/api/git', gitRoutes);
 
@@ -63,17 +63,6 @@ app.get('/api/system-status', async (req, res) => {
       claudeStatus = 'not_available';
     }
 
-    // Check Codex CLI availability
-    let codexStatus = 'unknown';
-    let codexVersion = '';
-    try {
-      const { stdout } = await execAsync('codex --version');
-      codexVersion = stdout.trim();
-      codexStatus = 'available';
-    } catch (error) {
-      codexStatus = 'not_available';
-    }
-
     // Check GitHub CLI availability
     let githubStatus = 'unknown';
     let githubVersion = '';
@@ -95,21 +84,17 @@ app.get('/api/system-status', async (req, res) => {
 
     // Get system metrics
     const gitService = req.app.locals.gitService;
-    const llmService = req.app.locals.llmService;
+    const claudeService = req.app.locals.claudeService;
 
     const repositories = gitService.getRepositories();
     const totalWorktrees = repositories.reduce((count: number, repo: any) => count + repo.worktrees.length, 0);
-    const instances = llmService.getInstances();
+    const instances = claudeService.getInstances();
     const activeInstances = instances.filter((i: any) => i.status === 'running' || i.status === 'starting').length;
 
     res.json({
       claude: {
         status: claudeStatus,
         version: claudeVersion
-      },
-      codex: {
-        status: codexStatus,
-        version: codexVersion
       },
       github: {
         status: githubStatus,
@@ -171,7 +156,7 @@ wss.on('connection', (ws, req) => {
 const gracefulShutdown = async () => {
   console.log('Shutting down gracefully...');
   
-  await llmService.cleanup();
+  await claudeService.cleanup();
   terminalService.cleanup();
   db.close();
   

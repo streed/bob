@@ -741,42 +741,6 @@ const SystemStatusDashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* Codex CLI Status */}
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: '16px',
-            backgroundColor: '#0d1117',
-            borderRadius: '6px',
-            border: '1px solid #21262d'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span style={{ fontSize: '20px' }}>{getStatusIcon(systemStatus.codex?.status || 'unknown')}</span>
-              <div>
-                <div style={{ color: '#fff', fontSize: '14px', fontWeight: 'bold' }}>Codex CLI</div>
-                <div style={{ color: '#888', fontSize: '12px' }}>
-                  {systemStatus.codex?.status === 'available' ? 'Ready for AI-powered features' : 'Alternative LLM provider for git analysis'}
-                </div>
-              </div>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{
-                color: getStatusColor(systemStatus.codex?.status || 'unknown'),
-                fontSize: '12px',
-                fontWeight: 'bold',
-                marginBottom: '2px'
-              }}>
-                {(systemStatus.codex?.status || 'unknown').replace('_', ' ').toUpperCase()}
-              </div>
-              {systemStatus.codex?.version && (
-                <div style={{ color: '#666', fontSize: '10px' }}>
-                  {systemStatus.codex.version}
-                </div>
-              )}
-            </div>
-          </div>
-
           {/* GitHub CLI Status */}
           <div style={{
             display: 'flex',
@@ -1511,7 +1475,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
       <div className="panel-header">
         <div>
           <h3 style={{ margin: 0, color: '#ffffff' }}>
-            {selectedInstance.provider?.toUpperCase() || 'Claude'} Instance
+            Claude Instance
             <span 
               className={`status ${selectedInstance.status}`}
               style={{ 
@@ -1544,7 +1508,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
               className="button danger"
               style={{ fontSize: '12px', padding: '6px 12px' }}
             >
-              {isStopping ? 'Stopping...' : `Stop ${selectedInstance.provider?.toUpperCase() || 'Claude'}`}
+              {isStopping ? 'Stopping...' : 'Stop Claude'}
             </button>
           )}
           
@@ -1555,7 +1519,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
               className="button"
               style={{ fontSize: '12px', padding: '6px 12px' }}
             >
-              {isRestarting ? 'Restarting...' : `Restart ${selectedInstance.provider?.toUpperCase() || 'Claude'}`}
+              {isRestarting ? 'Restarting...' : 'Restart Claude'}
             </button>
           )}
         </div>
@@ -1594,7 +1558,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
             fontSize: '13px'
           }}
         >
-          {selectedInstance.provider?.toUpperCase() || 'Claude'} {claudeTerminalSessionId && '●'}
+          Claude {claudeTerminalSessionId && '●'}
         </button>
         <button
           onClick={() => {
