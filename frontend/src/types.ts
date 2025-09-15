@@ -12,6 +12,7 @@ export interface Worktree {
   branch: string;
   repositoryId: string;
   instances: ClaudeInstance[];
+  isMainWorktree: boolean;
 }
 
 export interface ClaudeInstance {

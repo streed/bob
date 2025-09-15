@@ -86,8 +86,8 @@ export class DatabaseService {
   // Worktree methods
   async saveWorktree(worktree: Worktree): Promise<void> {
     await this.run(
-      `INSERT OR REPLACE INTO worktrees (id, repository_id, path, branch) VALUES (?, ?, ?, ?)`,
-      [worktree.id, worktree.repositoryId, worktree.path, worktree.branch]
+      `INSERT OR REPLACE INTO worktrees (id, repository_id, path, branch, is_main_worktree) VALUES (?, ?, ?, ?, ?)`,
+      [worktree.id, worktree.repositoryId, worktree.path, worktree.branch, worktree.isMainWorktree ? 1 : 0]
     );
   }
 
@@ -103,7 +103,8 @@ export class DatabaseService {
       repositoryId: row.repository_id,
       path: row.path,
       branch: row.branch,
-      instances
+      instances,
+      isMainWorktree: Boolean(row.is_main_worktree)
     };
   }
 
@@ -115,7 +116,8 @@ export class DatabaseService {
       repositoryId: row.repository_id,
       path: row.path,
       branch: row.branch,
-      instances: await this.getInstancesByWorktree(row.id)
+      instances: await this.getInstancesByWorktree(row.id),
+      isMainWorktree: Boolean(row.is_main_worktree)
     })));
 
     return worktrees;

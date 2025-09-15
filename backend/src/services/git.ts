@@ -82,6 +82,7 @@ export class GitService {
       const lines = stdout.trim().split('\n');
 
       let currentWorktree: Partial<Worktree> = {};
+      let isFirstWorktree = true; // The first worktree is always the main worktree
 
       for (const line of lines) {
         if (line.startsWith('worktree ')) {
@@ -98,10 +99,12 @@ export class GitService {
               path: currentWorktree.path,
               branch: currentWorktree.branch,
               repositoryId: repository.id,
-              instances: []
+              instances: [],
+              isMainWorktree: isFirstWorktree
             };
             worktrees.push(worktree);
             this.worktrees.set(worktreeId, worktree);
+            isFirstWorktree = false; // Only the first one is the main worktree
           }
           currentWorktree = {};
         }
@@ -114,7 +117,8 @@ export class GitService {
           path: currentWorktree.path,
           branch: currentWorktree.branch,
           repositoryId: repository.id,
-          instances: []
+          instances: [],
+          isMainWorktree: isFirstWorktree
         };
         worktrees.push(worktree);
         this.worktrees.set(worktreeId, worktree);
@@ -179,7 +183,8 @@ export class GitService {
         path: worktreePath,
         branch: branchName,
         repositoryId,
-        instances: []
+        instances: [],
+        isMainWorktree: false
       };
 
       this.worktrees.set(worktreeId, worktree);

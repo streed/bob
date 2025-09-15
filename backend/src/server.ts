@@ -87,9 +87,9 @@ app.get('/api/system-status', async (req, res) => {
     const claudeService = req.app.locals.claudeService;
 
     const repositories = gitService.getRepositories();
-    // Count only actual worktrees (exclude main repository entries)
+    // Count only actual worktrees (exclude main working trees)
     const totalWorktrees = repositories.reduce((count: number, repo: any) => {
-      const actualWorktrees = repo.worktrees.filter((worktree: any) => worktree.path !== repo.path);
+      const actualWorktrees = repo.worktrees.filter((worktree: any) => !worktree.isMainWorktree);
       return count + actualWorktrees.length;
     }, 0);
     const instances = claudeService.getInstances();

@@ -177,18 +177,16 @@ export const RepositoryPanel: React.FC<RepositoryPanelProps> = ({
                   </div>
                 )}
 
-                {/* Only show actual git worktrees (not the main repository) */}
+                {/* Only show actual git worktrees (not the main working tree) */}
                 {repo.worktrees.filter(worktree => {
-                  // Exclude worktrees that are actually the main repository
-                  // (worktree path matches repository path)
-                  return worktree.path !== repo.path;
+                  // Exclude main working trees that are not managed by Bob
+                  return !worktree.isMainWorktree;
                 }).length > 0 && (
                   <div className="worktrees-list">
                     {repo.worktrees
                       .filter(worktree => {
-                        // Exclude worktrees that are actually the main repository
-                        // (worktree path matches repository path)
-                        return worktree.path !== repo.path;
+                        // Exclude main working trees that are not managed by Bob
+                        return !worktree.isMainWorktree;
                       })
                       .map(worktree => {
                       const status = getWorktreeStatus(worktree);
