@@ -14,6 +14,7 @@ function App() {
   const [, setError] = useState<string | null>(null);
   const [instanceError, setInstanceError] = useState<string | null>(null);
   const [selectedWorktreeId, setSelectedWorktreeId] = useState<string | null>(null);
+  const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -218,6 +219,10 @@ function App() {
     await loadData();
   };
 
+  const toggleLeftPanel = () => {
+    setIsLeftPanelCollapsed(prev => !prev);
+  };
+
   // Get selected worktree and instance
   const selectedWorktree: Worktree | null = repositories
     .flatMap(repo => repo.worktrees)
@@ -266,6 +271,8 @@ function App() {
           onCreateWorktreeAndStartInstance={handleCreateWorktreeAndStartInstance}
           onSelectWorktree={handleSelectWorktree}
           onDeleteWorktree={handleDeleteWorktree}
+          isCollapsed={isLeftPanelCollapsed}
+          onToggleCollapse={toggleLeftPanel}
         />
         
         <TerminalPanel
@@ -278,6 +285,7 @@ function App() {
           onStopInstance={handleStopInstance}
           onDeleteWorktree={handleDeleteWorktree}
           error={instanceError}
+          isLeftPanelCollapsed={isLeftPanelCollapsed}
         />
       </div>
     </div>

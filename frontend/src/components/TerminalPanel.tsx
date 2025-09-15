@@ -13,6 +13,7 @@ interface TerminalPanelProps {
   onStopInstance: (instanceId: string) => Promise<void>;
   onDeleteWorktree: (worktreeId: string, force: boolean) => Promise<void>;
   error: string | null;
+  isLeftPanelCollapsed: boolean;
 }
 
 // Comment types
@@ -894,7 +895,8 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
   onRestartInstance,
   onStopInstance,
   onDeleteWorktree,
-  error
+  error,
+  isLeftPanelCollapsed
 }) => {
   const [claudeTerminalSessionId, setClaudeTerminalSessionId] = useState<string | null>(null);
   const [directoryTerminalSessionId, setDirectoryTerminalSessionId] = useState<string | null>(null);
