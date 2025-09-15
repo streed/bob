@@ -11,6 +11,7 @@ interface RepositoryPanelProps {
   onCreateWorktreeAndStartInstance: (repositoryId: string, branchName: string) => void;
   onSelectWorktree: (worktreeId: string) => Promise<void>;
   onDeleteWorktree: (worktreeId: string, force: boolean) => Promise<void>;
+  onCheckStates?: () => Promise<void>;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
 }
@@ -23,6 +24,7 @@ export const RepositoryPanel: React.FC<RepositoryPanelProps> = ({
   onCreateWorktreeAndStartInstance,
   onSelectWorktree,
   onDeleteWorktree,
+  onCheckStates,
   isCollapsed,
   onToggleCollapse
 }) => {
@@ -32,6 +34,7 @@ export const RepositoryPanel: React.FC<RepositoryPanelProps> = ({
   const [worktreeToDelete, setWorktreeToDelete] = useState<Worktree | null>(null);
   const [startingInstances, setStartingInstances] = useState<Set<string>>(new Set());
   const [copiedWorktreeId, setCopiedWorktreeId] = useState<string | null>(null);
+  const [isCheckingStates, setIsCheckingStates] = useState(false);
 
   const handleDirectorySelect = (path: string) => {
     onAddRepository(path);
@@ -137,6 +140,17 @@ export const RepositoryPanel: React.FC<RepositoryPanelProps> = ({
     }
   };
 
+  const handleCheckStates = async () => {
+    if (!onCheckStates || isCheckingStates) return;
+    
+    setIsCheckingStates(true);
+    try {
+      await onCheckStates();
+    } finally {
+      setIsCheckingStates(false);
+    }
+  };
+
   return (
     <div className={`left-panel ${isCollapsed ? 'collapsed' : ''}`}>
       <div className="panel-header">
@@ -176,6 +190,21 @@ export const RepositoryPanel: React.FC<RepositoryPanelProps> = ({
               <span>+</span>
               Add Repository
             </button>
+            {onCheckStates && (
+              <button 
+                onClick={handleCheckStates}
+                disabled={isCheckingStates}
+                className="add-repo-btn"
+                style={{ 
+                  marginTop: '8px',
+                  backgroundColor: isCheckingStates ? '#555' : '#4a90e2',
+                  cursor: isCheckingStates ? 'not-allowed' : 'pointer'
+                }}
+                title="Check all worktree states for PR and merge status"
+              >
+                {isCheckingStates ? '⟳ Checking...' : '🔄 Check States'}
+              </button>
+            )}
           </div>
 
           <div className="panel-content">

@@ -281,6 +281,24 @@ class ApiClient {
   }> {
     return this.request('/system-status');
   }
+
+  // Worktree state management
+  async checkWorktreeStates(): Promise<{ updated: number; errors: string[] }> {
+    return this.request('/repositories/check-states', {
+      method: 'POST',
+    });
+  }
+
+  async updateWorktreeState(worktreeId: string, state: 'working' | 'review' | 'done', prUrl?: string): Promise<Worktree> {
+    return this.request(`/repositories/worktrees/${worktreeId}/state`, {
+      method: 'PUT',
+      body: JSON.stringify({ state, prUrl }),
+    });
+  }
+
+  async checkPRStatus(worktreeId: string): Promise<{ hasPR: boolean; prUrl?: string; isMerged?: boolean }> {
+    return this.request(`/repositories/worktrees/${worktreeId}/pr-status`);
+  }
 }
 
 export const api = new ApiClient();

@@ -178,6 +178,24 @@ function App() {
     }
   };
 
+  const handleCheckStates = async () => {
+    try {
+      const result = await api.checkWorktreeStates();
+      console.log('State check result:', result);
+      
+      // Reload data to show updated states
+      await loadData();
+      
+      // Show a brief notification if states were updated
+      if (result.updated > 0) {
+        setError(null); // Clear any existing errors
+        // Could add a toast notification here in the future
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to check worktree states');
+    }
+  };
+
   const handleSelectWorktree = async (worktreeId: string) => {
     setSelectedWorktreeId(worktreeId);
 
@@ -271,6 +289,7 @@ function App() {
           onCreateWorktreeAndStartInstance={handleCreateWorktreeAndStartInstance}
           onSelectWorktree={handleSelectWorktree}
           onDeleteWorktree={handleDeleteWorktree}
+          onCheckStates={handleCheckStates}
           isCollapsed={isLeftPanelCollapsed}
           onToggleCollapse={toggleLeftPanel}
         />
