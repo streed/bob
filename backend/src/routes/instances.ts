@@ -1,11 +1,11 @@
 import { Router } from 'express';
-import { ClaudeService } from '../services/claude.js';
+import { LLMService } from '../services/llm-service.js';
 import { TerminalService } from '../services/terminal.js';
 import { GitService } from '../services/git.js';
 import { StartInstanceRequest } from '../types.js';
 
 export function createInstanceRoutes(
-  claudeService: ClaudeService, 
+  llmService: LLMService, 
   terminalService: TerminalService,
   gitService: GitService
 ): Router {
@@ -13,7 +13,7 @@ export function createInstanceRoutes(
 
   router.get('/', (req, res) => {
     try {
-      const instances = claudeService.getInstances();
+      const instances = llmService.getInstances();
       res.json(instances);
     } catch (error) {
       res.status(500).json({ error: 'Failed to get instances' });
@@ -22,7 +22,7 @@ export function createInstanceRoutes(
 
   router.get('/repository/:repositoryId', (req, res) => {
     try {
-      const instances = claudeService.getInstancesByRepository(req.params.repositoryId);
+      const instances = llmService.getInstancesByRepository(req.params.repositoryId);
       res.json(instances);
     } catch (error) {
       res.status(500).json({ error: 'Failed to get instances for repository' });
@@ -31,13 +31,13 @@ export function createInstanceRoutes(
 
   router.post('/', async (req, res) => {
     try {
-      const { worktreeId } = req.body as StartInstanceRequest;
+      const { worktreeId, provider = 'claude' } = req.body as StartInstanceRequest & { provider?: 'claude' | 'codex' };
       
       if (!worktreeId) {
         return res.status(400).json({ error: 'worktreeId is required' });
       }
 
-      const instance = await claudeService.startInstance(worktreeId);
+      const instance = await llmService.startInstance(worktreeId, provider);
       res.status(201).json(instance);
     } catch (error) {
       res.status(500).json({ error: `Failed to start instance: ${error}` });
@@ -46,7 +46,7 @@ export function createInstanceRoutes(
 
   router.get('/:id', (req, res) => {
     try {
-      const instance = claudeService.getInstance(req.params.id);
+      const instance = llmService.getInstance(req.params.id);
       if (!instance) {
         return res.status(404).json({ error: 'Instance not found' });
       }
@@ -58,7 +58,7 @@ export function createInstanceRoutes(
 
   router.delete('/:id', async (req, res) => {
     try {
-      await claudeService.stopInstance(req.params.id);
+      await llmService.stopInstance(req.params.id);
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: `Failed to stop instance: ${error}` });
@@ -67,7 +67,7 @@ export function createInstanceRoutes(
 
   router.post('/:id/restart', async (req, res) => {
     try {
-      const instance = await claudeService.restartInstance(req.params.id);
+      const instance = await llmService.restartInstance(req.params.id);
       res.json(instance);
     } catch (error) {
       res.status(500).json({ error: `Failed to restart instance: ${error}` });
@@ -76,7 +76,7 @@ export function createInstanceRoutes(
 
   router.post('/:id/terminal', (req, res) => {
     try {
-      const instance = claudeService.getInstance(req.params.id);
+      const instance = llmService.getInstance(req.params.id);
       if (!instance) {
         return res.status(404).json({ error: 'Instance not found' });
       }
@@ -87,7 +87,7 @@ export function createInstanceRoutes(
         });
       }
 
-      const claudePty = claudeService.getClaudePty(req.params.id);
+      const claudePty = llmService.getPty(req.params.id);
       if (!claudePty) {
         return res.status(404).json({ 
           error: 'Claude terminal not available. The Claude process may have stopped unexpectedly.' 
@@ -103,7 +103,7 @@ export function createInstanceRoutes(
 
   router.post('/:id/terminal/directory', (req, res) => {
     try {
-      const instance = claudeService.getInstance(req.params.id);
+      const instance = llmService.getInstance(req.params.id);
       if (!instance) {
         return res.status(404).json({ error: 'Instance not found' });
       }

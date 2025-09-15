@@ -24,6 +24,7 @@ export interface ClaudeInstance {
   createdAt: Date;
   lastActivity?: Date;
   errorMessage?: string;
+  provider?: 'claude' | 'codex'; // LLM provider type
 }
 
 export interface CreateWorktreeRequest {
