@@ -192,10 +192,7 @@ export const DirectoryBrowser: React.FC<DirectoryBrowserProps> = ({
                       cursor: 'pointer',
                       display: 'flex',
                       justifyContent: 'space-between',
-                      alignItems: 'center',
-                      ':hover': {
-                        background: '#333'
-                      }
+                      alignItems: 'center'
                     }}
                     onMouseEnter={(e) => e.currentTarget.style.background = '#333'}
                     onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}

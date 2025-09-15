@@ -25,6 +25,7 @@ interface DiffComment {
   severity: 'low' | 'medium' | 'high';
   isAI?: boolean;
   userReply?: string;
+  isDismissed?: boolean;
 }
 
 // Inline comment component

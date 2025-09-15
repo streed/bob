@@ -8,10 +8,6 @@ interface DeleteWorktreeModalProps {
   onConfirm: (worktreeId: string, force: boolean) => Promise<void>;
 }
 
-interface InstanceInfo {
-  id: string;
-  status: string;
-}
 
 export const DeleteWorktreeModal: React.FC<DeleteWorktreeModalProps> = ({
   worktree,

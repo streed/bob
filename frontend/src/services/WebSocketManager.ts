@@ -382,7 +382,7 @@ class WebSocketManager {
       this.heartbeatTimer = null;
     }
 
-    for (const [sessionId, conn] of this.connections) {
+    for (const [_sessionId, conn] of this.connections) {
       conn.isDestroyed = true;
       conn.callbacks.clear();
       if (conn.ws.readyState !== WebSocket.CLOSED) {

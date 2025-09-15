@@ -56,7 +56,7 @@ export function useProgressOperation() {
   ): Promise<T> => {
     return withProgress(
       { title },
-      async (controls) => {
+      async (_controls) => {
         const result = await operation();
         return result;
       }

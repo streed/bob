@@ -1,5 +1,13 @@
 import React, { useRef } from 'react';
 
+// Extend HTMLInputElement to include webkitdirectory
+declare module 'react' {
+  interface InputHTMLAttributes<T> extends AriaAttributes, DOMAttributes<T> {
+    webkitdirectory?: string;
+    directory?: string;
+  }
+}
+
 interface DirectoryPickerProps {
   onDirectorySelect: (path: string) => void;
   placeholder?: string;
