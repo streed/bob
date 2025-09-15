@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import { GitService } from '../services/git.js';
-import { LLMService } from '../services/llm-service.js';
+import { ClaudeService } from '../services/claude.js';
 import { CreateWorktreeRequest } from '../types.js';
 
-export function createRepositoryRoutes(gitService: GitService, llmService: LLMService): Router {
+export function createRepositoryRoutes(gitService: GitService, claudeService: ClaudeService): Router {
   const router = Router();
 
   router.get('/', async (req, res) => {
@@ -81,11 +81,11 @@ export function createRepositoryRoutes(gitService: GitService, llmService: LLMSe
       
       // If force delete, stop all instances first
       if (force) {
-        const instances = llmService.getInstancesByWorktree(worktreeId);
+        const instances = claudeService.getInstancesByWorktree(worktreeId);
         for (const instance of instances) {
           if (instance.status === 'running' || instance.status === 'starting') {
             console.log(`Force delete: stopping instance ${instance.id} for worktree ${worktreeId}`);
-            await llmService.stopInstance(instance.id);
+            await claudeService.stopInstance(instance.id);
           }
         }
         
@@ -95,8 +95,8 @@ export function createRepositoryRoutes(gitService: GitService, llmService: LLMSe
         // Refresh the worktree to get updated instance statuses
         const worktree = gitService.getWorktree(worktreeId);
         if (worktree) {
-          // Update instances from llm service
-          const updatedInstances = llmService.getInstancesByWorktree(worktreeId);
+          // Update instances from claude service
+          const updatedInstances = claudeService.getInstancesByWorktree(worktreeId);
           worktree.instances = updatedInstances;
         }
       }

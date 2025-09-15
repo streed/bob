@@ -129,8 +129,8 @@ export class DatabaseService {
   async saveInstance(instance: ClaudeInstance): Promise<void> {
     await this.run(
       `INSERT OR REPLACE INTO claude_instances 
-       (id, repository_id, worktree_id, status, pid, port, last_activity, provider)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       (id, repository_id, worktree_id, status, pid, port, last_activity)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         instance.id,
         instance.repositoryId,
@@ -138,8 +138,7 @@ export class DatabaseService {
         instance.status,
         instance.pid || null,
         instance.port || null,
-        instance.lastActivity ? new Date(instance.lastActivity).toISOString() : null,
-        instance.provider || 'claude'
+        instance.lastActivity ? new Date(instance.lastActivity).toISOString() : null
       ]
     );
   }
@@ -157,8 +156,7 @@ export class DatabaseService {
       pid: row.pid || undefined,
       port: row.port || undefined,
       createdAt: new Date(row.created_at),
-      lastActivity: row.last_activity ? new Date(row.last_activity) : undefined,
-      provider: row.provider || 'claude'
+      lastActivity: row.last_activity ? new Date(row.last_activity) : undefined
     };
   }
 
@@ -173,8 +171,7 @@ export class DatabaseService {
       pid: row.pid || undefined,
       port: row.port || undefined,
       createdAt: new Date(row.created_at),
-      lastActivity: row.last_activity ? new Date(row.last_activity) : undefined,
-      provider: row.provider || 'claude'
+      lastActivity: row.last_activity ? new Date(row.last_activity) : undefined
     }));
   }
 
@@ -189,8 +186,7 @@ export class DatabaseService {
       pid: row.pid || undefined,
       port: row.port || undefined,
       createdAt: new Date(row.created_at),
-      lastActivity: row.last_activity ? new Date(row.last_activity) : undefined,
-      provider: row.provider || 'claude'
+      lastActivity: row.last_activity ? new Date(row.last_activity) : undefined
     }));
   }
 
@@ -205,8 +201,7 @@ export class DatabaseService {
       pid: row.pid || undefined,
       port: row.port || undefined,
       createdAt: new Date(row.created_at),
-      lastActivity: row.last_activity ? new Date(row.last_activity) : undefined,
-      provider: row.provider || 'claude'
+      lastActivity: row.last_activity ? new Date(row.last_activity) : undefined
     }));
   }
 
