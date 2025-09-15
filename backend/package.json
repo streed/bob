@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "description": "Bob Backend - API for Claude Code instance management",
   "main": "dist/server.js",
+  "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",

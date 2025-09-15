@@ -87,9 +87,9 @@ app.get('/api/system-status', async (req, res) => {
     const claudeService = req.app.locals.claudeService;
 
     const repositories = gitService.getRepositories();
-    const totalWorktrees = repositories.reduce((count, repo) => count + repo.worktrees.length, 0);
+    const totalWorktrees = repositories.reduce((count: number, repo: any) => count + repo.worktrees.length, 0);
     const instances = claudeService.getInstances();
-    const activeInstances = instances.filter(i => i.status === 'running' || i.status === 'starting').length;
+    const activeInstances = instances.filter((i: any) => i.status === 'running' || i.status === 'starting').length;
 
     res.json({
       claude: {

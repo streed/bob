@@ -159,7 +159,7 @@ router.post('/:worktreeId/generate-commit-message', async (req, res) => {
       let diffWithComments = diff;
       if (comments && comments.length > 0) {
         diffWithComments += '\n\n=== CODE REVIEW COMMENTS ===\n';
-        const commentsByFile = comments.reduce((acc, comment) => {
+        const commentsByFile = comments.reduce((acc: Record<string, any[]>, comment: any) => {
           if (!acc[comment.file]) acc[comment.file] = [];
           acc[comment.file].push(comment);
           return acc;
@@ -167,7 +167,7 @@ router.post('/:worktreeId/generate-commit-message', async (req, res) => {
 
         Object.entries(commentsByFile).forEach(([file, fileComments]) => {
           diffWithComments += `\nFile: ${file}\n`;
-          fileComments.forEach(comment => {
+          (fileComments as any[]).forEach((comment: any) => {
             diffWithComments += `Line ${comment.line} (${comment.type}${comment.isAI ? ' - AI Generated' : ' - User'}): ${comment.message}\n`;
             if (comment.userReply) {
               diffWithComments += `  User Reply: ${comment.userReply}\n`;
@@ -399,7 +399,7 @@ router.post('/:worktreeId/create-pr', async (req, res) => {
       res.json({
         message: 'Branch pushed successfully. Create PR manually on GitHub.',
         branch: branchName,
-        title: lastCommit
+        title: prTitle
       });
     }
   } catch (error) {
@@ -775,7 +775,7 @@ router.post('/:worktreeId/comments', async (req, res) => {
       databaseService.run(
         'INSERT INTO diff_comments (id, analysis_id, worktree_id, file_path, line_number, comment_type, message, severity, is_ai_generated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [commentId, analysisId, worktreeId, file, line, 'user', message, 'low', false],
-        function(err: any) {
+        function(this: any, err: any) {
           if (err) reject(err);
           else resolve(this);
         }
@@ -875,7 +875,7 @@ router.post('/:worktreeId/apply-fixes', async (req, res) => {
     }
 
     // Group comments by file
-    const commentsByFile = comments.reduce((acc, comment) => {
+    const commentsByFile = comments.reduce((acc: Record<string, any[]>, comment: any) => {
       if (!acc[comment.file_path]) {
         acc[comment.file_path] = [];
       }
@@ -914,7 +914,7 @@ IMPORTANT INSTRUCTIONS:
 File: ${filePath}
 
 Comments to address:
-${fileComments.map(c =>
+${(fileComments as any[]).map((c: any) =>
   `Line ${c.line}: [${c.type}] ${c.message}${c.userReply ? `\n  User feedback: ${c.userReply}` : ''}`
 ).join('\n')}
 
@@ -926,7 +926,7 @@ Return only the complete file content with the requested improvements applied.`;
         // Only apply changes if the content actually changed
         if (fixedContent && fixedContent.trim() !== originalContent.trim()) {
           await fs.promises.writeFile(fullFilePath, fixedContent, 'utf8');
-          totalFixesApplied += fileComments.length;
+          totalFixesApplied += (fileComments as any[]).length;
           modifiedFiles.push(filePath);
           console.log(`Successfully applied fixes to ${filePath}`);
         } else {

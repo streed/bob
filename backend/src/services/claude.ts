@@ -256,8 +256,7 @@ export class ClaudeService {
   }
 
   private setupPtyHandlers(instance: ClaudeInstance, claudePty: IPty): void {
-    // Remove any existing listeners first to prevent memory leaks
-    claudePty.removeAllListeners();
+    // Note: IPty doesn't have removeAllListeners, listeners are replaced when new ones are set
 
     claudePty.onExit((exitCode) => {
       console.log(`Claude Code PTY ${instance.id} exited with code ${exitCode}`);
@@ -335,7 +334,6 @@ export class ClaudeService {
     // Handle PTY processes
     const claudePty = this.ptyProcesses.get(instanceId);
     if (claudePty) {
-      claudePty.removeAllListeners(); // Remove listeners first
       claudePty.kill();
       this.ptyProcesses.delete(instanceId);
     }
