@@ -56,9 +56,7 @@ function MainApp() {
   // Refresh data when returning to main app (e.g., from database page)
   useEffect(() => {
     const fromDatabase = searchParams.get('fromDatabase');
-    console.log('Location changed:', location.pathname, 'fromDatabase param:', fromDatabase);
     if (location.pathname === '/' && fromDatabase === 'true') {
-      console.log('Refreshing data due to return from database page');
       // Immediately refresh data when returning from database page
       loadData();
       // Remove the parameter from URL after processing
@@ -99,14 +97,10 @@ function MainApp() {
 
   const loadData = async () => {
     try {
-      console.log('Loading data... (timestamp:', new Date().toISOString(), ')');
       const [reposData, instancesData] = await Promise.all([
         api.getRepositories(),
         api.getInstances()
       ]);
-      
-      console.log('Repositories loaded:', reposData);
-      console.log('Instances loaded:', instancesData);
       
       setRepositories(reposData);
       setInstances(instancesData);
