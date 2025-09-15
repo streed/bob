@@ -896,7 +896,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
   onStopInstance,
   onDeleteWorktree,
   error,
-  isLeftPanelCollapsed
+  isLeftPanelCollapsed: _isLeftPanelCollapsed
 }) => {
   const [claudeTerminalSessionId, setClaudeTerminalSessionId] = useState<string | null>(null);
   const [directoryTerminalSessionId, setDirectoryTerminalSessionId] = useState<string | null>(null);
