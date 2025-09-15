@@ -17,7 +17,20 @@ export class DatabaseService {
 
   constructor(dbPath: string = 'bob.db') {
     this.db = new sqlite3.Database(dbPath);
-    this.run = promisify(this.db.run.bind(this.db));
+    
+    // Custom promisify for run method to properly handle the callback signature
+    this.run = (sql: string, params?: any[]) => {
+      return new Promise<sqlite3.RunResult>((resolve, reject) => {
+        this.db.run(sql, params || [], function(this: sqlite3.RunResult, err: Error | null) {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(this);
+          }
+        });
+      });
+    };
+    
     this.get = promisify(this.db.get.bind(this.db));
     this.all = promisify(this.db.all.bind(this.db));
     this.migrationRunner = new MigrationRunner(this.db);
