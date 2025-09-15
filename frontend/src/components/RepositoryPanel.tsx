@@ -206,18 +206,10 @@ export const RepositoryPanel: React.FC<RepositoryPanelProps> = ({
                       </div>
                     )}
 
-                    {/* Only show actual git worktrees (not the main working tree) */}
-                    {repo.worktrees.filter(worktree => {
-                      // Exclude main working trees that are not managed by Bob
-                      return !worktree.isMainWorktree;
-                    }).length > 0 && (
+                    {/* Show all Bob-managed worktrees (main worktrees are excluded from data) */}
+                    {repo.worktrees.length > 0 && (
                       <div className="worktrees-list">
-                        {repo.worktrees
-                          .filter(worktree => {
-                            // Exclude main working trees that are not managed by Bob
-                            return !worktree.isMainWorktree;
-                          })
-                          .map(worktree => {
+                        {repo.worktrees.map(worktree => {
                           const status = getWorktreeStatus(worktree);
                           const isSelected = selectedWorktreeId === worktree.id;
                           const isStarting = startingInstances.has(worktree.id);
@@ -314,12 +306,7 @@ export const RepositoryPanel: React.FC<RepositoryPanelProps> = ({
       {isCollapsed && repositories.length > 0 && (
         <div className="collapsed-content">
           {repositories.map(repo => 
-            repo.worktrees
-              .filter(worktree => {
-                // Exclude main working trees that are not managed by Bob
-                return !worktree.isMainWorktree;
-              })
-              .map(worktree => {
+            repo.worktrees.map(worktree => {
                 const status = getWorktreeStatus(worktree);
                 const isSelected = selectedWorktreeId === worktree.id;
                 const isStarting = startingInstances.has(worktree.id);

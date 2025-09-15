@@ -93,35 +93,42 @@ export class GitService {
           currentWorktree.branch = branch;
         } else if (line === '') {
           if (currentWorktree.path && currentWorktree.branch) {
-            const worktreeId = Buffer.from(currentWorktree.path).toString('base64');
-            const worktree: Worktree = {
-              id: worktreeId,
-              path: currentWorktree.path,
-              branch: currentWorktree.branch,
-              repositoryId: repository.id,
-              instances: [],
-              isMainWorktree: isFirstWorktree
-            };
-            worktrees.push(worktree);
-            this.worktrees.set(worktreeId, worktree);
+            // Skip the main worktree - Bob should not manage it
+            if (!isFirstWorktree) {
+              const worktreeId = Buffer.from(currentWorktree.path).toString('base64');
+              const worktree: Worktree = {
+                id: worktreeId,
+                path: currentWorktree.path,
+                branch: currentWorktree.branch,
+                repositoryId: repository.id,
+                instances: [],
+                isMainWorktree: false // Only non-main worktrees are managed by Bob
+              };
+              worktrees.push(worktree);
+              this.worktrees.set(worktreeId, worktree);
+            }
             isFirstWorktree = false; // Only the first one is the main worktree
           }
           currentWorktree = {};
         }
       }
 
+      // Handle the last worktree if there's no empty line at the end
       if (currentWorktree.path && currentWorktree.branch) {
-        const worktreeId = Buffer.from(currentWorktree.path).toString('base64');
-        const worktree: Worktree = {
-          id: worktreeId,
-          path: currentWorktree.path,
-          branch: currentWorktree.branch,
-          repositoryId: repository.id,
-          instances: [],
-          isMainWorktree: isFirstWorktree
-        };
-        worktrees.push(worktree);
-        this.worktrees.set(worktreeId, worktree);
+        // Skip the main worktree - Bob should not manage it
+        if (!isFirstWorktree) {
+          const worktreeId = Buffer.from(currentWorktree.path).toString('base64');
+          const worktree: Worktree = {
+            id: worktreeId,
+            path: currentWorktree.path,
+            branch: currentWorktree.branch,
+            repositoryId: repository.id,
+            instances: [],
+            isMainWorktree: false // Only non-main worktrees are managed by Bob
+          };
+          worktrees.push(worktree);
+          this.worktrees.set(worktreeId, worktree);
+        }
       }
 
       return worktrees;
