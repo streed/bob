@@ -38,6 +38,8 @@ function MainApp() {
   const navigate = useNavigate();
   const location = useLocation();
   const { isDatabaseUnlocked } = useCheatCode();
+  const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
+
   const refreshRequested = useRef(false);
 
   const [repositories, setRepositories] = useState<Repository[]>([]);
@@ -46,7 +48,8 @@ function MainApp() {
   const [, setError] = useState<string | null>(null);
   const [instanceError, setInstanceError] = useState<string | null>(null);
   const [selectedWorktreeId, setSelectedWorktreeId] = useState<string | null>(null);
-  const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
+  // Force re-render key for RepositoryPanel to ensure fresh data display
+  const [repositoryPanelKey, setRepositoryPanelKey] = useState(0);
 
   useEffect(() => {
     loadData();
@@ -57,10 +60,20 @@ function MainApp() {
   // Listen for database refresh events
   useEffect(() => {
     const handleDatabaseRefresh = () => {
+      console.log('Database refresh event received, triggering loadData()');
       loadData();
     };
 
     window.addEventListener('databaseRefreshRequested', handleDatabaseRefresh);
+    
+    // Also check if there's a pending refresh request in sessionStorage
+    const pendingRefresh = sessionStorage.getItem('pendingDatabaseRefresh');
+    if (pendingRefresh === 'true') {
+      console.log('Found pending database refresh in sessionStorage, triggering loadData()');
+      sessionStorage.removeItem('pendingDatabaseRefresh');
+      loadData();
+    }
+    
     return () => {
       window.removeEventListener('databaseRefreshRequested', handleDatabaseRefresh);
     };
@@ -70,6 +83,7 @@ function MainApp() {
   useEffect(() => {
     const fromDatabase = searchParams.get('fromDatabase');
     if (location.pathname === '/' && fromDatabase === 'true' && !refreshRequested.current) {
+      console.log('URL parameter refresh detected, triggering loadData()');
       refreshRequested.current = true;
       // Immediately refresh data when returning from database page
       loadData();
@@ -115,13 +129,16 @@ function MainApp() {
 
   const loadData = async () => {
     try {
+      console.log('loadData() called - fetching repositories and instances');
       const [reposData, instancesData] = await Promise.all([
         api.getRepositories(),
         api.getInstances()
       ]);
       
+      console.log('loadData() completed:', { repositories: reposData.length, instances: instancesData.length });
       setRepositories(reposData);
       setInstances(instancesData);
+      setRepositoryPanelKey(prev => prev + 1); // Force RepositoryPanel re-render
       setError(null);
     } catch (err) {
       console.error('Failed to load data:', err);
@@ -355,6 +372,7 @@ function MainApp() {
 
       <div className="main-layout">
         <RepositoryPanel
+          key={repositoryPanelKey}
           repositories={repositories}
           instances={instances}
           selectedWorktreeId={selectedWorktreeId}
