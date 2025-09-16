@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Routes, Route, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { Repository, ClaudeInstance, Worktree } from './types';
 import { api } from './api';
@@ -40,16 +40,12 @@ function MainApp() {
   const { isDatabaseUnlocked } = useCheatCode();
   const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
 
-  const refreshRequested = useRef(false);
-
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [instances, setInstances] = useState<ClaudeInstance[]>([]);
   const [loading, setLoading] = useState(true);
   const [, setError] = useState<string | null>(null);
   const [instanceError, setInstanceError] = useState<string | null>(null);
   const [selectedWorktreeId, setSelectedWorktreeId] = useState<string | null>(null);
-  // Force re-render key for RepositoryPanel to ensure fresh data display
-  const [repositoryPanelKey, setRepositoryPanelKey] = useState(0);
 
   useEffect(() => {
     loadData();
@@ -57,48 +53,9 @@ function MainApp() {
     return () => clearInterval(interval);
   }, []);
 
-  // Listen for database refresh events
-  useEffect(() => {
-    const handleDatabaseRefresh = () => {
-      console.log('Database refresh event received, triggering loadData()');
-      loadData();
-    };
+  // Listen for database refresh events - REMOVED to fix constant refreshing issue
 
-    window.addEventListener('databaseRefreshRequested', handleDatabaseRefresh);
-    
-    // Also check if there's a pending refresh request in sessionStorage
-    const pendingRefresh = sessionStorage.getItem('pendingDatabaseRefresh');
-    if (pendingRefresh === 'true') {
-      console.log('Found pending database refresh in sessionStorage, triggering loadData()');
-      sessionStorage.removeItem('pendingDatabaseRefresh');
-      loadData();
-    }
-    
-    return () => {
-      window.removeEventListener('databaseRefreshRequested', handleDatabaseRefresh);
-    };
-  }, []);
-
-  // Fallback: URL parameter approach for data refresh when returning from database
-  useEffect(() => {
-    const fromDatabase = searchParams.get('fromDatabase');
-    if (location.pathname === '/' && fromDatabase === 'true' && !refreshRequested.current) {
-      console.log('URL parameter refresh detected, triggering loadData()');
-      refreshRequested.current = true;
-      // Immediately refresh data when returning from database page
-      loadData();
-      // Remove the parameter from URL after processing
-      setSearchParams(prev => {
-        const newParams = new URLSearchParams(prev);
-        newParams.delete('fromDatabase');
-        return newParams;
-      });
-      // Reset flag after a short delay
-      setTimeout(() => {
-        refreshRequested.current = false;
-      }, 1000);
-    }
-  }, [location, searchParams, setSearchParams]);
+  // Fallback: URL parameter approach for data refresh when returning from database - REMOVED to fix constant refreshing issue
 
   // Handle URL parameters for direct worktree linking
   useEffect(() => {
@@ -129,16 +86,13 @@ function MainApp() {
 
   const loadData = async () => {
     try {
-      console.log('loadData() called - fetching repositories and instances');
       const [reposData, instancesData] = await Promise.all([
         api.getRepositories(),
         api.getInstances()
       ]);
       
-      console.log('loadData() completed:', { repositories: reposData.length, instances: instancesData.length });
       setRepositories(reposData);
       setInstances(instancesData);
-      setRepositoryPanelKey(prev => prev + 1); // Force RepositoryPanel re-render
       setError(null);
     } catch (err) {
       console.error('Failed to load data:', err);
@@ -372,7 +326,6 @@ function MainApp() {
 
       <div className="main-layout">
         <RepositoryPanel
-          key={repositoryPanelKey}
           repositories={repositories}
           instances={instances}
           selectedWorktreeId={selectedWorktreeId}

@@ -374,20 +374,8 @@ export function DatabaseManager() {
         <h2>Database Management</h2>
         <button 
           onClick={() => {
-            // Multiple approaches for maximum reliability:
-            
-            // 1. SessionStorage flag for persistence across navigation
-            sessionStorage.setItem('pendingDatabaseRefresh', 'true');
-            
-            // 2. Fallback approach: use URL parameter for compatibility
-            navigate('/?fromDatabase=true');
-            
-            // 3. Primary approach: dispatch a custom event for immediate refresh
-            // Do this after navigation to ensure the component is ready
-            setTimeout(() => {
-              console.log('DatabaseManager: Dispatching databaseRefreshRequested event');
-              window.dispatchEvent(new CustomEvent('databaseRefreshRequested'));
-            }, 100);
+            // Simple navigation back to main app
+            navigate('/');
           }}
           className="button-secondary"
         >
