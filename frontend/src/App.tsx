@@ -53,10 +53,6 @@ function MainApp() {
     return () => clearInterval(interval);
   }, []);
 
-  // Listen for database refresh events - REMOVED to fix constant refreshing issue
-
-  // Fallback: URL parameter approach for data refresh when returning from database - REMOVED to fix constant refreshing issue
-
   // Handle URL parameters for direct worktree linking
   useEffect(() => {
     const worktreeParam = searchParams.get('worktree');
@@ -296,7 +292,7 @@ function MainApp() {
               style={{
                 cursor: 'pointer',
                 transition: 'color 0.2s ease',
-                margin: 0
+                margin: 20,
               }}
               onMouseEnter={(e) => (e.target as HTMLElement).style.color = '#58a6ff'}
               onMouseLeave={(e) => (e.target as HTMLElement).style.color = ''}
@@ -321,7 +317,6 @@ function MainApp() {
             </nav>
           </div>
         </div>
-        <p>Manage multiple Claude Code instances across git repositories and worktrees</p>
       </div>
 
       <div className="main-layout">
