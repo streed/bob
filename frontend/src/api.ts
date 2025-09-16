@@ -47,6 +47,12 @@ class ApiClient {
     });
   }
 
+  async refreshMainBranch(repositoryId: string): Promise<Repository> {
+    return this.request(`/repositories/${repositoryId}/refresh-main`, {
+      method: 'POST',
+    });
+  }
+
   async checkWorktreeMergeStatus(worktreeId: string): Promise<{ isMerged: boolean; targetBranch: string }> {
     return this.request(`/repositories/worktrees/${worktreeId}/merge-status`);
   }
@@ -280,6 +286,52 @@ class ApiClient {
     };
   }> {
     return this.request('/system-status');
+  }
+
+  // Database management operations
+  async getDatabaseTables(): Promise<string[]> {
+    return this.request('/database/tables');
+  }
+
+  async getTableSchema(tableName: string): Promise<any[]> {
+    return this.request(`/database/tables/${tableName}/schema`);
+  }
+
+  async getTableData(tableName: string, page: number = 1, limit: number = 50): Promise<{
+    data: any[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    return this.request(`/database/tables/${tableName}/data?page=${page}&limit=${limit}`);
+  }
+
+  async executeQuery(sql: string): Promise<any[]> {
+    return this.request('/database/query', {
+      method: 'POST',
+      body: JSON.stringify({ sql }),
+    });
+  }
+
+  async deleteRows(tableName: string, whereClause: string, confirm: boolean = false): Promise<{
+    message: string;
+    affectedRows: number;
+  }> {
+    return this.request(`/database/tables/${tableName}/rows`, {
+      method: 'DELETE',
+      body: JSON.stringify({ whereClause, confirm }),
+    });
+  }
+
+  async updateRows(tableName: string, setClause: string, whereClause: string, confirm: boolean = false): Promise<{
+    message: string;
+    affectedRows: number;
+  }> {
+    return this.request(`/database/tables/${tableName}/rows`, {
+      method: 'PUT',
+      body: JSON.stringify({ setClause, whereClause, confirm }),
+    });
   }
 }
 

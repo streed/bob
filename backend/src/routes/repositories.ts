@@ -50,6 +50,15 @@ export function createRepositoryRoutes(gitService: GitService, claudeService: Cl
     }
   });
 
+  router.post('/:id/refresh-main', async (req, res) => {
+    try {
+      const repository = await gitService.refreshMainBranch(req.params.id);
+      res.json(repository);
+    } catch (error) {
+      res.status(500).json({ error: `Failed to refresh main branch: ${error}` });
+    }
+  });
+
   router.post('/:id/worktrees', async (req, res) => {
     try {
       const { branchName, baseBranch } = req.body as CreateWorktreeRequest;

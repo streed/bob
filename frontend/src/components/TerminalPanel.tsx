@@ -898,6 +898,10 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
   error,
   isLeftPanelCollapsed
 }) => {
+  // Suppress TypeScript warning for unused parameter
+  // This parameter is part of the interface for future UI responsiveness features
+  void isLeftPanelCollapsed;
+  
   const [claudeTerminalSessionId, setClaudeTerminalSessionId] = useState<string | null>(null);
   const [directoryTerminalSessionId, setDirectoryTerminalSessionId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'claude' | 'directory' | 'git'>('claude');

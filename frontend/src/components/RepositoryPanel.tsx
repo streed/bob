@@ -11,6 +11,7 @@ interface RepositoryPanelProps {
   onCreateWorktreeAndStartInstance: (repositoryId: string, branchName: string) => void;
   onSelectWorktree: (worktreeId: string) => Promise<void>;
   onDeleteWorktree: (worktreeId: string, force: boolean) => Promise<void>;
+  onRefreshMainBranch: (repositoryId: string) => Promise<void>;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
 }
@@ -23,6 +24,7 @@ export const RepositoryPanel: React.FC<RepositoryPanelProps> = ({
   onCreateWorktreeAndStartInstance,
   onSelectWorktree,
   onDeleteWorktree,
+  onRefreshMainBranch,
   isCollapsed,
   onToggleCollapse
 }) => {
@@ -32,6 +34,7 @@ export const RepositoryPanel: React.FC<RepositoryPanelProps> = ({
   const [worktreeToDelete, setWorktreeToDelete] = useState<Worktree | null>(null);
   const [startingInstances, setStartingInstances] = useState<Set<string>>(new Set());
   const [copiedWorktreeId, setCopiedWorktreeId] = useState<string | null>(null);
+  const [refreshingRepositories, setRefreshingRepositories] = useState<Set<string>>(new Set());
 
   const handleDirectorySelect = (path: string) => {
     onAddRepository(path);
@@ -106,6 +109,25 @@ export const RepositoryPanel: React.FC<RepositoryPanelProps> = ({
     }
   };
 
+  const handleRefreshMainBranch = async (repositoryId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    setRefreshingRepositories(prev => new Set(prev).add(repositoryId));
+    
+    try {
+      await onRefreshMainBranch(repositoryId);
+    } catch (error) {
+      console.error('Failed to refresh main branch:', error);
+      // Could add error notification here
+    } finally {
+      setRefreshingRepositories(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(repositoryId);
+        return newSet;
+      });
+    }
+  };
+
   return (
     <div className={`left-panel ${isCollapsed ? 'collapsed' : ''}`}>
       <div className="panel-header">
@@ -161,6 +183,33 @@ export const RepositoryPanel: React.FC<RepositoryPanelProps> = ({
                       <div className="repository-info">
                         <h4>{repo.name}</h4>
                         <p>{repo.path}</p>
+                        <div style={{ 
+                          fontSize: '12px', 
+                          color: '#888', 
+                          marginTop: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
+                        }}>
+                          <span>Main: <strong>{repo.mainBranch}</strong></span>
+                          <button
+                            onClick={(e) => handleRefreshMainBranch(repo.id, e)}
+                            disabled={refreshingRepositories.has(repo.id)}
+                            style={{
+                              background: '#6c757d',
+                              color: '#fff',
+                              border: 'none',
+                              padding: '2px 6px',
+                              borderRadius: '3px',
+                              cursor: refreshingRepositories.has(repo.id) ? 'not-allowed' : 'pointer',
+                              fontSize: '10px',
+                              opacity: refreshingRepositories.has(repo.id) ? 0.6 : 1
+                            }}
+                            title={refreshingRepositories.has(repo.id) ? 'Refreshing...' : 'Refresh main branch'}
+                          >
+                            {refreshingRepositories.has(repo.id) ? '↻' : '⟳'}
+                          </button>
+                        </div>
                       </div>
                       <button
                         onClick={() => setShowNewWorktreeForm(repo.id)}
@@ -206,18 +255,10 @@ export const RepositoryPanel: React.FC<RepositoryPanelProps> = ({
                       </div>
                     )}
 
-                    {/* Only show actual git worktrees (not regular git branches) for safety */}
-                    {repo.worktrees.filter(worktree => {
-                      const branchName = worktree.branch.toLowerCase();
-                      return !branchName.endsWith('/main') && !branchName.endsWith('/master');
-                    }).length > 0 && (
+                    {/* Show all Bob-managed worktrees (main worktrees are excluded from data) */}
+                    {repo.worktrees.length > 0 && (
                       <div className="worktrees-list">
-                        {repo.worktrees
-                          .filter(worktree => {
-                            const branchName = worktree.branch.toLowerCase();
-                            return !branchName.endsWith('/main') && !branchName.endsWith('/master');
-                          })
-                          .map(worktree => {
+                        {repo.worktrees.map(worktree => {
                           const status = getWorktreeStatus(worktree);
                           const isSelected = selectedWorktreeId === worktree.id;
                           const isStarting = startingInstances.has(worktree.id);
@@ -314,12 +355,7 @@ export const RepositoryPanel: React.FC<RepositoryPanelProps> = ({
       {isCollapsed && repositories.length > 0 && (
         <div className="collapsed-content">
           {repositories.map(repo => 
-            repo.worktrees
-              .filter(worktree => {
-                const branchName = worktree.branch.toLowerCase();
-                return !branchName.endsWith('/main') && !branchName.endsWith('/master');
-              })
-              .map(worktree => {
+            repo.worktrees.map(worktree => {
                 const status = getWorktreeStatus(worktree);
                 const isSelected = selectedWorktreeId === worktree.id;
                 const isStarting = startingInstances.has(worktree.id);

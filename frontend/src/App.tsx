@@ -1,12 +1,44 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Routes, Route, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { Repository, ClaudeInstance, Worktree } from './types';
 import { api } from './api';
 import { RepositoryPanel } from './components/RepositoryPanel';
 import { TerminalPanel } from './components/TerminalPanel';
+import { DatabaseManager } from './components/DatabaseManager';
+import { useCheatCode } from './contexts/CheatCodeContext';
 
 function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<MainApp />} />
+      <Route path="/database" element={<DatabaseRoute />} />
+    </Routes>
+  );
+}
+
+function DatabaseRoute() {
+  const { isDatabaseUnlocked } = useCheatCode();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!isDatabaseUnlocked) {
+      navigate('/');
+    }
+  }, [isDatabaseUnlocked, navigate]);
+
+  if (!isDatabaseUnlocked) {
+    return null;
+  }
+
+  return <DatabaseManager />;
+}
+
+function MainApp() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { isDatabaseUnlocked } = useCheatCode();
+  const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
 
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [instances, setInstances] = useState<ClaudeInstance[]>([]);
@@ -14,7 +46,6 @@ function App() {
   const [, setError] = useState<string | null>(null);
   const [instanceError, setInstanceError] = useState<string | null>(null);
   const [selectedWorktreeId, setSelectedWorktreeId] = useState<string | null>(null);
-  const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -51,14 +82,10 @@ function App() {
 
   const loadData = async () => {
     try {
-      console.log('Loading data...');
       const [reposData, instancesData] = await Promise.all([
         api.getRepositories(),
         api.getInstances()
       ]);
-      
-      console.log('Repositories loaded:', reposData);
-      console.log('Instances loaded:', instancesData);
       
       setRepositories(reposData);
       setInstances(instancesData);
@@ -93,6 +120,16 @@ function App() {
       setInstanceError(err instanceof Error ? err.message : 'Failed to create worktree and start instance');
       // Clear error after 10 seconds
       setTimeout(() => setInstanceError(null), 10000);
+    }
+  };
+
+  const handleRefreshMainBranch = async (repositoryId: string) => {
+    try {
+      await api.refreshMainBranch(repositoryId);
+      await loadData();
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to refresh main branch');
     }
   };
 
@@ -244,22 +281,42 @@ function App() {
   return (
     <div className="container">
       <div className="header">
-        <h1
-          onClick={() => {
-            setSelectedWorktreeId(null);
-            setSearchParams({});
-          }}
-          style={{
-            cursor: 'pointer',
-            transition: 'color 0.2s ease',
-            margin: 0
-          }}
-          onMouseEnter={(e) => (e.target as HTMLElement).style.color = '#58a6ff'}
-          onMouseLeave={(e) => (e.target as HTMLElement).style.color = ''}
-        >
-          Bob
-        </h1>
-        <p>Manage multiple Claude Code instances across git repositories and worktrees</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+            <h1
+              onClick={() => {
+                setSelectedWorktreeId(null);
+                setSearchParams({});
+                navigate('/');
+              }}
+              style={{
+                cursor: 'pointer',
+                transition: 'color 0.2s ease',
+                margin: 20,
+              }}
+              onMouseEnter={(e) => (e.target as HTMLElement).style.color = '#58a6ff'}
+              onMouseLeave={(e) => (e.target as HTMLElement).style.color = ''}
+            >
+              Bob
+            </h1>
+            <nav style={{ display: 'flex', gap: '16px' }}>
+              <button
+                onClick={() => navigate('/')}
+                className={`nav-button ${location.pathname === '/' ? 'active' : ''}`}
+              >
+                Home
+              </button>
+              {isDatabaseUnlocked && (
+                <button
+                  onClick={() => navigate('/database')}
+                  className={`nav-button ${location.pathname === '/database' ? 'active' : ''}`}
+                >
+                  Database
+                </button>
+              )}
+            </nav>
+          </div>
+        </div>
       </div>
 
       <div className="main-layout">
@@ -271,6 +328,7 @@ function App() {
           onCreateWorktreeAndStartInstance={handleCreateWorktreeAndStartInstance}
           onSelectWorktree={handleSelectWorktree}
           onDeleteWorktree={handleDeleteWorktree}
+          onRefreshMainBranch={handleRefreshMainBranch}
           isCollapsed={isLeftPanelCollapsed}
           onToggleCollapse={toggleLeftPanel}
         />

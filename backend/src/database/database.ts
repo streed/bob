@@ -17,7 +17,20 @@ export class DatabaseService {
 
   constructor(dbPath: string = 'bob.db') {
     this.db = new sqlite3.Database(dbPath);
-    this.run = promisify(this.db.run.bind(this.db));
+    
+    // Custom promisify for run method to properly handle the callback signature
+    this.run = (sql: string, params?: any[]) => {
+      return new Promise<sqlite3.RunResult>((resolve, reject) => {
+        this.db.run(sql, params || [], function(this: sqlite3.RunResult, err: Error | null) {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(this);
+          }
+        });
+      });
+    };
+    
     this.get = promisify(this.db.get.bind(this.db));
     this.all = promisify(this.db.all.bind(this.db));
     this.migrationRunner = new MigrationRunner(this.db);
@@ -44,8 +57,8 @@ export class DatabaseService {
   // Repository methods
   async saveRepository(repo: Repository): Promise<void> {
     await this.run(
-      `INSERT OR REPLACE INTO repositories (id, name, path, branch) VALUES (?, ?, ?, ?)`,
-      [repo.id, repo.name, repo.path, repo.branch]
+      `INSERT OR REPLACE INTO repositories (id, name, path, branch, main_branch) VALUES (?, ?, ?, ?, ?)`,
+      [repo.id, repo.name, repo.path, repo.branch, repo.mainBranch]
     );
   }
 
@@ -61,6 +74,7 @@ export class DatabaseService {
       name: row.name,
       path: row.path,
       branch: row.branch,
+      mainBranch: row.main_branch || row.branch, // Fallback to current branch if main_branch is null
       worktrees
     };
   }
@@ -73,6 +87,7 @@ export class DatabaseService {
       name: row.name,
       path: row.path,
       branch: row.branch,
+      mainBranch: row.main_branch || row.branch, // Fallback to current branch if main_branch is null
       worktrees: await this.getWorktreesByRepository(row.id)
     })));
 
@@ -103,7 +118,8 @@ export class DatabaseService {
       repositoryId: row.repository_id,
       path: row.path,
       branch: row.branch,
-      instances
+      instances,
+      isMainWorktree: false // All worktrees in the database are non-main worktrees
     };
   }
 
@@ -115,7 +131,8 @@ export class DatabaseService {
       repositoryId: row.repository_id,
       path: row.path,
       branch: row.branch,
-      instances: await this.getInstancesByWorktree(row.id)
+      instances: await this.getInstancesByWorktree(row.id),
+      isMainWorktree: false // All worktrees in the database are non-main worktrees
     })));
 
     return worktrees;
@@ -435,6 +452,41 @@ export class DatabaseService {
        WHERE session_start < date('now', '-' || ? || ' days')`,
       [daysToKeep]
     );
+  }
+
+  // Database administration methods
+  async getAllTables(): Promise<string[]> {
+    const result = await this.all(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+    );
+    return result.map(row => row.name);
+  }
+
+  async getTableSchema(tableName: string): Promise<any[]> {
+    return await this.all(`PRAGMA table_info(${tableName})`);
+  }
+
+  async getTableData(tableName: string, limit: number = 50, offset: number = 0): Promise<any[]> {
+    return await this.all(`SELECT * FROM ${tableName} LIMIT ? OFFSET ?`, [limit, offset]);
+  }
+
+  async getTableCount(tableName: string): Promise<number> {
+    const result = await this.get(`SELECT COUNT(*) as count FROM ${tableName}`);
+    return result.count;
+  }
+
+  async executeQuery(sql: string): Promise<any[]> {
+    return await this.all(sql);
+  }
+
+  async deleteRows(tableName: string, whereClause: string): Promise<number> {
+    const result = await this.run(`DELETE FROM ${tableName} WHERE ${whereClause}`);
+    return result.changes || 0;
+  }
+
+  async updateRows(tableName: string, setClause: string, whereClause: string): Promise<number> {
+    const result = await this.run(`UPDATE ${tableName} SET ${setClause} WHERE ${whereClause}`);
+    return result.changes || 0;
   }
 
   close(): void {

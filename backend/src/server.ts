@@ -10,6 +10,7 @@ import { DatabaseService } from './database/database.js';
 import { createRepositoryRoutes } from './routes/repositories.js';
 import { createInstanceRoutes } from './routes/instances.js';
 import { createFilesystemRoutes } from './routes/filesystem.js';
+import { createDatabaseRoutes } from './routes/database.js';
 import gitRoutes from './routes/git.js';
 
 const app = express();
@@ -35,6 +36,7 @@ console.log('Services initialized');
 app.use('/api/repositories', createRepositoryRoutes(gitService, claudeService));
 app.use('/api/instances', createInstanceRoutes(claudeService, terminalService, gitService));
 app.use('/api/filesystem', createFilesystemRoutes());
+app.use('/api/database', createDatabaseRoutes(db));
 
 // Make services available to git routes
 app.locals.gitService = gitService;
@@ -87,7 +89,11 @@ app.get('/api/system-status', async (req, res) => {
     const claudeService = req.app.locals.claudeService;
 
     const repositories = gitService.getRepositories();
-    const totalWorktrees = repositories.reduce((count: number, repo: any) => count + repo.worktrees.length, 0);
+    // Count only actual worktrees (exclude main working trees)
+    const totalWorktrees = repositories.reduce((count: number, repo: any) => {
+      const actualWorktrees = repo.worktrees.filter((worktree: any) => !worktree.isMainWorktree);
+      return count + actualWorktrees.length;
+    }, 0);
     const instances = claudeService.getInstances();
     const activeInstances = instances.filter((i: any) => i.status === 'running' || i.status === 'starting').length;
 

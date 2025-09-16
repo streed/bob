@@ -3,6 +3,7 @@ export interface Repository {
   name: string;
   path: string;
   branch: string;
+  mainBranch: string; // The default/main branch (main, master, etc.)
   worktrees: Worktree[];
 }
 
@@ -12,6 +13,7 @@ export interface Worktree {
   branch: string;
   repositoryId: string;
   instances: ClaudeInstance[];
+  isMainWorktree: boolean;
 }
 
 export interface ClaudeInstance {
