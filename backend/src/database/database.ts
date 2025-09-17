@@ -2,6 +2,7 @@ import sqlite3 from 'sqlite3';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { promisify } from 'util';
+import { mkdirSync, existsSync } from 'fs';
 import { Repository, Worktree, ClaudeInstance } from '../types.js';
 import { MigrationRunner } from './migration-runner.js';
 
@@ -14,9 +15,21 @@ export class DatabaseService {
   private run: (sql: string, params?: any[]) => Promise<sqlite3.RunResult>;
   private get: (sql: string, params?: any[]) => Promise<any>;
   private all: (sql: string, params?: any[]) => Promise<any[]>;
+  private initializationPromise: Promise<void>;
 
-  constructor(dbPath: string = 'bob.db') {
-    this.db = new sqlite3.Database(dbPath);
+  constructor(dbPath?: string) {
+    // Use DB_PATH environment variable if available, otherwise fallback to parameter or default
+    const actualDbPath = dbPath || process.env.DB_PATH || 'bob.db';
+    
+    // Ensure the directory exists
+    const dbDir = dirname(actualDbPath);
+    if (!existsSync(dbDir)) {
+      console.log(`Creating database directory: ${dbDir}`);
+      mkdirSync(dbDir, { recursive: true });
+    }
+    
+    console.log(`Initializing database at: ${actualDbPath}`);
+    this.db = new sqlite3.Database(actualDbPath);
     
     // Custom promisify for run method to properly handle the callback signature
     this.run = (sql: string, params?: any[]) => {
@@ -34,7 +47,13 @@ export class DatabaseService {
     this.get = promisify(this.db.get.bind(this.db));
     this.all = promisify(this.db.all.bind(this.db));
     this.migrationRunner = new MigrationRunner(this.db);
-    this.initialize();
+    
+    // Start initialization but don't block constructor
+    this.initializationPromise = this.initialize();
+  }
+
+  async waitForInitialization(): Promise<void> {
+    return this.initializationPromise;
   }
 
   private async initialize(): Promise<void> {
