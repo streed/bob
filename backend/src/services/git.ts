@@ -195,29 +195,17 @@ export class GitService {
 
     // Auto-detect default branch if not provided
     if (!baseBranch) {
-      try {
-        const { stdout: defaultBranch } = await execAsync('git rev-parse --abbrev-ref HEAD', {
-          cwd: repository.path
-        });
-        baseBranch = defaultBranch.trim();
-      } catch (error) {
-        // Fallback: try main, then master
-        try {
-          await execAsync('git show-ref --verify --quiet refs/heads/main', {
-            cwd: repository.path
-          });
-          baseBranch = 'main';
-        } catch {
-          try {
-            await execAsync('git show-ref --verify --quiet refs/heads/master', {
-              cwd: repository.path
-            });
-            baseBranch = 'master';
-          } catch {
-            throw new Error('Could not determine default branch (tried HEAD, main, master)');
-          }
-        }
-      }
+      baseBranch = repository.mainBranch;
+    }
+
+    // Pull the latest changes from the base branch before creating worktree
+    try {
+      console.log(`Pulling latest changes for ${baseBranch} before creating worktree`);
+      await execAsync('git fetch origin', { cwd: repository.path });
+      await execAsync(`git pull origin ${baseBranch}`, { cwd: repository.path });
+    } catch (error) {
+      console.warn(`Warning: Could not pull latest changes for ${baseBranch}: ${error}`);
+      // Continue with worktree creation even if pull fails
     }
 
     // Create worktrees in ~/.bob directory
