@@ -3,6 +3,8 @@ import cors from 'cors';
 import path from 'path';
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 import { GitService } from './services/git.js';
 import { ClaudeService } from './services/claude.js';
 import { TerminalService } from './services/terminal.js';
@@ -12,6 +14,9 @@ import { createInstanceRoutes } from './routes/instances.js';
 import { createFilesystemRoutes } from './routes/filesystem.js';
 import { createDatabaseRoutes } from './routes/database.js';
 import gitRoutes from './routes/git.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const app = express();
 const server = createServer(app);
