@@ -33,7 +33,6 @@ export const RepositoryPanel: React.FC<RepositoryPanelProps> = ({
   const [newBranchName, setNewBranchName] = useState('');
   const [worktreeToDelete, setWorktreeToDelete] = useState<Worktree | null>(null);
   const [startingInstances, setStartingInstances] = useState<Set<string>>(new Set());
-  const [copiedWorktreeId, setCopiedWorktreeId] = useState<string | null>(null);
   const [refreshingRepositories, setRefreshingRepositories] = useState<Set<string>>(new Set());
 
   const handleDirectorySelect = (path: string) => {
@@ -51,21 +50,21 @@ export const RepositoryPanel: React.FC<RepositoryPanelProps> = ({
 
   const getWorktreeStatus = (worktree: Worktree) => {
     const worktreeInstances = instances.filter(i => i.worktreeId === worktree.id);
-    if (worktreeInstances.length === 0) return { status: 'none', label: 'No Instance' };
-    
+    if (worktreeInstances.length === 0) return { status: 'none' };
+
     // Since we enforce single instance per worktree, just get the first (and only) instance
     const instance = worktreeInstances[0];
-    
+
     switch (instance.status) {
       case 'running':
-        return { status: 'running', label: 'Running' };
+        return { status: 'running' };
       case 'starting':
-        return { status: 'starting', label: 'Starting' };
+        return { status: 'starting' };
       case 'error':
-        return { status: 'error', label: 'Error' };
+        return { status: 'error' };
       case 'stopped':
       default:
-        return { status: 'stopped', label: 'Stopped' };
+        return { status: 'stopped' };
     }
   };
 
@@ -92,22 +91,6 @@ export const RepositoryPanel: React.FC<RepositoryPanelProps> = ({
     }
   };
 
-  const handleCopyWorktreeLink = async (worktreeId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const currentUrl = new URL(window.location.href);
-    currentUrl.searchParams.set('worktree', worktreeId);
-    const linkUrl = currentUrl.toString();
-
-    try {
-      await navigator.clipboard.writeText(linkUrl);
-      setCopiedWorktreeId(worktreeId);
-      setTimeout(() => setCopiedWorktreeId(null), 2000);
-    } catch (err) {
-      console.error('Failed to copy link:', err);
-      // Fallback: show the URL in a prompt
-      prompt('Copy this link:', linkUrl);
-    }
-  };
 
   const handleRefreshMainBranch = async (repositoryId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -285,39 +268,19 @@ export const RepositoryPanel: React.FC<RepositoryPanelProps> = ({
                                 <div
                                   className={`instance-status ${isStarting ? 'starting' : status.status}`}
                                   style={{
+                                    width: '12px',
+                                    height: '12px',
+                                    borderRadius: '50%',
                                     backgroundColor:
                                       isStarting ? '#ffc107' :
                                       status.status === 'running' ? '#28a745' :
                                       status.status === 'starting' ? '#ffc107' :
                                       status.status === 'error' ? '#dc3545' :
                                       status.status === 'stopped' ? '#6c757d' :
-                                      status.status === 'none' ? '#888' : '#444',
-                                    color:
-                                      isStarting || status.status === 'starting' ? '#000' :
-                                      status.status === 'none' ? '#fff' :
-                                      '#fff'
+                                      status.status === 'none' ? '#888' : '#444'
                                   }}
-                                >
-                                  {isStarting ? 'Starting...' : status.label}
-                                </div>
+                                ></div>
                               </div>
-                              <button
-                                onClick={(e) => handleCopyWorktreeLink(worktree.id, e)}
-                                style={{
-                                  background: copiedWorktreeId === worktree.id ? '#28a745' : '#6c757d',
-                                  color: '#fff',
-                                  border: 'none',
-                                  padding: '4px 8px',
-                                  borderRadius: '3px',
-                                  cursor: 'pointer',
-                                  fontSize: '12px',
-                                  marginLeft: '8px',
-                                  flexShrink: 0
-                                }}
-                                title={copiedWorktreeId === worktree.id ? "Link copied!" : "Copy direct link to this worktree"}
-                              >
-                                {copiedWorktreeId === worktree.id ? '✓' : '🔗'}
-                              </button>
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -394,22 +357,18 @@ export const RepositoryPanel: React.FC<RepositoryPanelProps> = ({
                     </div>
                     <div
                       style={{
-                        fontSize: '8px',
-                        padding: '1px 4px',
-                        borderRadius: '2px',
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
                         backgroundColor:
                           isStarting ? '#ffc107' :
                           status.status === 'running' ? '#28a745' :
                           status.status === 'starting' ? '#ffc107' :
                           status.status === 'error' ? '#dc3545' :
                           status.status === 'stopped' ? '#6c757d' :
-                          status.status === 'none' ? '#888' : '#444',
-                        color:
-                          isStarting || status.status === 'starting' ? '#000' : '#fff'
+                          status.status === 'none' ? '#888' : '#444'
                       }}
-                    >
-                      {isStarting ? 'Starting...' : status.label}
-                    </div>
+                    ></div>
                   </div>
                 );
               })
